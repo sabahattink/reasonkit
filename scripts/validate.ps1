@@ -79,6 +79,7 @@ try {
     throw 'TASK-001 fixture must remain red before the participant fix.'
   }
 
+  $global:LASTEXITCODE = 0
   Write-Output 'ReasonKit validation passed'
 }
 finally {
