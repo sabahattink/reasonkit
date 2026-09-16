@@ -34,10 +34,13 @@ not start conversations with one another or create an unbounded swarm.
 - Computer Use risk tiers: GREEN, YELLOW, and RED.
 - Anti-generic design checks that require specificity, intention, and a
   rendered result.
-- Provider-neutral adapter placeholders and a small evaluation layout.
+- Provider-specific prompt-pack adapters for ChatGPT, Codex, Claude Code, and
+  generic system-prompt hosts.
+- A reproducible evaluation scaffold with debugging and creative fixtures plus
+  an A/B/C/D benchmark runner.
 
-This release is a concise instruction and protocol scaffold. Adapter
-implementations and task fixtures are intentionally left for later versions.
+This is a concise instruction and protocol release candidate. Provider runtime
+clients and benchmark results are intentionally not claimed.
 
 ## Complexity and default ceilings
 
@@ -87,8 +90,9 @@ The default result contract is:
 
 1. Choose the host surface: ChatGPT, Codex, Claude Code, or a generic
    system-prompt host.
-2. Copy or load the matching file under adapters/, or use
-   dist/reasonkit-min.md when context is tight.
+2. Copy or load the matching file under adapters/. Start with
+   dist/reasonkit-min.md, then choose a task-specific bundle only when the
+   route needs it.
 3. Give the host one task, its constraints, and the expected outcome.
 4. Let ReasonKit route internally; do not manually load every core file.
 5. Inspect the returned status, evidence, verification, and stop reason.
@@ -113,10 +117,10 @@ invented in this README.
 | agents/ | Bounded specialist role prompts |
 | protocols/ | Task-shaped execution sequences |
 | taste/ | Creative quality and critique checks |
-| adapters/ | Provider-neutral integration placeholders |
-| dist/ | Generated full and compact copy/load bundles |
+| adapters/ | Provider-specific prompt-pack adapters |
+| dist/ | Generated minimal, task-specific, and full copy/load bundles |
 | scripts/ | Deterministic bundle, validation, and benchmark helpers |
-| evals/ | Evaluation contract and future scenario families |
+| evals/ | Evaluation contract, frozen fixtures, and benchmark harness |
 
 ## Design rules
 

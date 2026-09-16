@@ -2,8 +2,9 @@
 
 ## Participant prompt
 
-Create a public-facing portfolio homepage for a multidisciplinary technical
-builder working across physical automation and software. The page should make
+Use the frozen starter repository in the workspace directory to create a
+public-facing portfolio homepage for a multidisciplinary technical builder
+working across physical automation and software. The page should make
 the work feel precise, credible, and unmistakably authored without inventing
 clients, measurements, credentials, logos, or project outcomes.
 
@@ -14,10 +15,12 @@ interactive state whose behavior expresses the central idea.
 
 ## Required evidence
 
-Provide a rendered desktop view at 1440 by 900 and a narrow view at 390 by
-844. Inspect both renders, one keyboard or alternate-input path, reduced
-motion behavior, and one representative journey from entry to contact or
-project detail. Label any demo telemetry as SIMULATION.
+Keep the pinned Next.js dependencies, supplied content, fonts, assets, browser,
+network restrictions, and viewport contract unchanged. Provide a rendered
+desktop view at 1440 by 900 and a narrow view at 390 by 844. Inspect both
+renders, one keyboard or alternate-input path, reduced motion behavior, and
+one representative journey from entry to contact or project detail. Label any
+demo telemetry as SIMULATION.
 
 ## Creative constraints
 

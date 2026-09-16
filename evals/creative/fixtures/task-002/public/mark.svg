@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title">
+  <title>Fixed evaluation mark</title>
+  <rect width="160" height="160" fill="#15211f"/>
+  <path d="M32 32h44v16H48v28h28v16H48v20h28v16H32V32Zm68 0h28v16h-12v80h12v16h-28V32Z" fill="#f1eee7"/>
+</svg>

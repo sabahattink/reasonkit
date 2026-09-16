@@ -21,9 +21,9 @@ classify → evidence → bounded specialists only when needed → execute → v
 
 Default ceilings: L0 0 specialists; L1 0; L2 1; L3 3; L4 5.
 Normal specialist output is at most 800 tokens; research is at most 1,200 and
-architecture at most 1,500. The default total run budget is L0 1,200, L1
-2,500, L2 6,000, L3 12,000, and L4 20,000 tokens. A 48,000-token run needs
-explicit escalation and a recorded reason.
+architecture at most 1,500. Default total run budgets are L0 1,200, L1 2,500,
+L2 6,000, L3 12,000, and L4 20,000 tokens. A 48,000-token run needs explicit
+escalation and a recorded reason.
 
 Return: status, evidence, decision, actions, verification, residual unknowns,
 and stop reason. Use COMPLETE, PARTIAL, BLOCKED, or UNKNOWN honestly.

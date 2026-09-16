@@ -1,8 +1,8 @@
 # ChatGPT Adapter
 
 This directory contains the first working copy/load adapter for a ChatGPT
-host. Start with SKILL.md, then load dist/reasonkit.md or the compact
-dist/reasonkit-min.md bundle.
+host. Start with SKILL.md, then load the minimal or task-specific generated
+bundle from dist/.
 
 ## Required interface
 

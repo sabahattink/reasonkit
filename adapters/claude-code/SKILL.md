@@ -2,8 +2,9 @@
 
 ## Install
 
-Load dist/reasonkit.md as the reusable instruction. Use
-dist/reasonkit-min.md for a compact context.
+Load dist/reasonkit-min.md as the default reusable instruction. Use the
+task-specific dist bundle for coding, debugging, design, or research. Load
+dist/reasonkit-full.md only when explicitly needed.
 
 ## Use
 

@@ -2,15 +2,14 @@
 
 ## Participant prompt
 
-You are given the repository fixture under
-evals/debugging/fixtures/task-001/. Run its test, diagnose the failure, and
-make the smallest safe change that satisfies the tests. Preserve unrelated
-files. Explain the confirmed cause, the patch, the checks run, and any
-unverified assumption.
+You are given a frozen repository fixture in the workspace directory. Run its
+test, diagnose the failure, and make the smallest safe change that satisfies
+the tests. Preserve unrelated files. Explain the confirmed cause, the patch,
+the checks run, and any unverified assumption.
 
 ## Starting state
 
-The fixture contains a deliberately small environment-file parser and a
+The workspace contains a deliberately small environment-file parser and a
 failing test. The baseline is intentionally red. The parser must:
 
 - Ignore blank lines and comment lines.
@@ -20,8 +19,9 @@ failing test. The baseline is intentionally red. The parser must:
 - Remove matching single or double quotes around a value.
 - Ignore malformed lines without an equals sign.
 
-Run the verification command from evals/benchmark.json before and after the
-change. The expected end state is a passing test without unrelated edits.
+Run the verification command from the run metadata inside the isolated
+workspace before and after the change. The expected end state is a passing
+test without unrelated edits.
 
 ## Constraints
 

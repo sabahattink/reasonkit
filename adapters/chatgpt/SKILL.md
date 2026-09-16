@@ -2,9 +2,12 @@
 
 ## Install
 
-Copy or load dist/reasonkit.md as the reusable instruction for the host. When
-the context window is tight, use dist/reasonkit-min.md. No manual loading of
-the core files is required.
+Copy or load dist/reasonkit-min.md as the default reusable instruction for the
+host. For a named task, use dist/reasonkit-coding.md,
+dist/reasonkit-debugging.md, dist/reasonkit-design.md, or
+dist/reasonkit-research.md. Load dist/reasonkit-full.md only when the task
+explicitly needs cross-protocol coverage. No manual loading of the core files
+is required.
 
 ## Use
 

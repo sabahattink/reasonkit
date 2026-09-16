@@ -1,7 +1,7 @@
 # Evaluation Scaffold
 
-The evals directory will measure whether ReasonKit improves process discipline,
-not whether it makes one model imitate another.
+The evals directory provides a repeatable way to measure process discipline,
+not whether ReasonKit makes one model imitate another.
 
 ## Evaluation contract
 
@@ -38,37 +38,58 @@ Score the process on:
 | architecture/ | Interfaces, seams, depth, tradeoffs, and migration |
 | creative/ | Specificity, rendered inspection, interaction, and journey |
 
-No benchmark scores are claimed in v0.1. A future executable harness should
-store raw observations and evaluator reasoning, not only a single aggregate
-number.
+No benchmark scores are claimed in v0.1. The current harness stores raw
+observations and evaluator reasoning rather than reducing a run to one
+aggregate number.
 
 ## First A/B/C/D run
 
 The first comparison is defined in benchmark.json:
 
 - A: Luna vanilla.
-- B: Luna plus evaluator-supplied Reliable Engineering v0.1.
-- C: Luna plus the generated ReasonKit bundle.
+- B: Luna plus the frozen Reliable Engineering v0.1 baseline.
+- C: Luna plus the case-specific generated ReasonKit bundle.
 - D: Astra vanilla.
 
-Prepare all eight session packets with:
+Prepare all eight isolated session packets with:
 
     powershell -File scripts/run-benchmark.ps1 -PrepareAll
 
-To run one externally configured host command, provide its executable and
-arguments:
+The runner creates task.md, the selected instruction bundle, a frozen
+workspace/, run.json, metrics.json, and (when a command is supplied)
+model-output.txt. It records source commit, dirty state, fixture SHA-256,
+instruction SHA-256, instruction bytes, and the workspace contract before the
+host starts.
 
-    powershell -File scripts/run-benchmark.ps1 -Case TASK-001 -Arm C -Command node -ArgumentList evals/debugging/fixtures/task-001/parser.test.js
+The following is a runner smoke check, not a model run:
 
-The runner captures the task, arm condition, instruction bundle, raw output,
-and a metrics template. It does not call a provider API and does not invent
-tokens, quality, agent count, or tool-call data. Do not publish a release or a
-quality graph until raw outputs and verification records exist.
+    powershell -File scripts/run-benchmark.ps1 -Case TASK-001 -Arm C -Command node -ArgumentList parser.test.js
+
+For a real host, the provider-neutral command contract is:
+
+    reasonkit-host --model Luna --prompt $REASONKIT_PROMPT_FILE --instructions $REASONKIT_INSTRUCTION_FILE --workspace $REASONKIT_WORKSPACE --output $REASONKIT_OUTPUT_FILE --metrics $REASONKIT_METRICS_FILE
+
+The host command is supplied by the evaluator. The runner does not call a
+provider API, modify a shared fixture, or invent tokens, quality, agent count,
+or tool-call data. The host may write measured fields to
+REASONKIT_METRICS_FILE; fields without provider evidence remain null.
+
+Token fields remain independently measured:
+
+    input_tokens
+    cached_input_tokens
+    output_tokens
+    reasoning_tokens
+    total_tokens
+    instruction_bytes
+
+The primary report is quality versus total measured tokens. Quality versus
+output tokens is secondary. A missing provider metric remains null.
 
 ## Reporting
 
-Once runs are verified, plot quality on the vertical axis and generated tokens
-on the horizontal axis. Keep A, B, C, and D visible as separate points and
+Once runs are verified, plot quality on the vertical axis and total measured
+tokens on the horizontal axis. Keep A, B, C, and D visible as separate points and
 include agent count, tool calls, verification status, and evaluator notes
 alongside the plot. A missing metric remains missing; it is not replaced with a
 model estimate.

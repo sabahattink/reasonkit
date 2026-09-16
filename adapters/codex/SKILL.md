@@ -2,8 +2,10 @@
 
 ## Install
 
-Load dist/reasonkit.md as the reusable instruction for the Codex task. Use
-dist/reasonkit-min.md when the task needs the smallest possible context.
+Load dist/reasonkit-min.md as the default reusable instruction. Use
+dist/reasonkit-coding.md, dist/reasonkit-debugging.md, dist/reasonkit-design.md,
+or dist/reasonkit-research.md for task-specific context. Load
+dist/reasonkit-full.md only when explicitly needed.
 
 ## Use
 

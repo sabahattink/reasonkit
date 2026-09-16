@@ -1,0 +1,23 @@
+{
+  "kicker": "Multidisciplinary technical builder",
+  "title": "Systems that make complexity legible.",
+  "intro": "A fixed content surface for the creative evaluation. Replace this with supplied facts; do not invent proof.",
+  "primaryAction": "View the work",
+  "projects": [
+    {
+      "id": "01",
+      "title": "[Project title]",
+      "summary": "[One evidence-backed project summary]"
+    },
+    {
+      "id": "02",
+      "title": "[Project title]",
+      "summary": "[One evidence-backed project summary]"
+    },
+    {
+      "id": "03",
+      "title": "[Project title]",
+      "summary": "[One evidence-backed project summary]"
+    }
+  ]
+}

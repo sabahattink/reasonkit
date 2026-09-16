@@ -1,35 +1,31 @@
 {
   "version": "0.1",
   "name": "ReasonKit A/B/C/D baseline",
-  "description": "A repeatable case and metric manifest. The runner never invents model results.",
+  "description": "A repeatable isolated case and metric manifest. The runner records provenance and never invents model results.",
   "arms": [
     {
       "id": "A",
       "name": "Luna vanilla",
       "model": "Luna",
-      "condition": "No orchestration or engineering instruction pack.",
-      "instructionFile": null
+      "condition": "No orchestration or engineering instruction pack."
     },
     {
       "id": "B",
       "name": "Luna plus Reliable Engineering v0.1",
       "model": "Luna",
-      "condition": "Evaluator-supplied Reliable Engineering v0.1 baseline; record its exact source and version.",
-      "instructionFile": null
+      "condition": "Load the frozen Reliable Engineering v0.1 baseline from evals/arms/."
     },
     {
       "id": "C",
       "name": "Luna plus ReasonKit",
       "model": "Luna",
-      "condition": "Load the generated ReasonKit distribution bundle.",
-      "instructionFile": "dist/reasonkit.md"
+      "condition": "Load the case-specific generated ReasonKit distribution bundle."
     },
     {
       "id": "D",
       "name": "Astra vanilla",
       "model": "Astra",
-      "condition": "No orchestration or engineering instruction pack.",
-      "instructionFile": null
+      "condition": "No orchestration or engineering instruction pack."
     }
   ],
   "cases": [
@@ -37,32 +33,70 @@
       "id": "TASK-001",
       "title": "Debug a small repository parser regression",
       "promptFile": "evals/debugging/TASK-001.md",
-      "verificationCommand": "node evals/debugging/fixtures/task-001/parser.test.js",
+      "workspaceSource": "evals/debugging/fixtures/task-001",
+      "verificationCommand": "node parser.test.js",
+      "instructionFiles": {
+        "A": null,
+        "B": "evals/arms/reliable-engineering-v0.1.md",
+        "C": "dist/reasonkit-debugging.md",
+        "D": null
+      },
+      "instructionSha256": {
+        "A": null,
+        "B": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+        "C": "5f586dadc2b013c7d67409e7a098bbf94a3ce9af509e223da9ef18ad8a680985",
+        "D": null
+      },
       "metrics": [
-        "task_success",
-        "tokens",
-        "agent_count",
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "instruction_bytes",
         "tool_calls",
+        "agent_count",
+        "task_success",
         "duration_seconds",
-        "verification_status"
+        "verification_status",
+        "diff_in_scope"
       ]
     },
     {
       "id": "TASK-002",
       "title": "Redesign a multidisciplinary technical portfolio",
       "promptFile": "evals/creative/TASK-002.md",
+      "workspaceSource": "evals/creative/fixtures/task-002",
       "verificationCommand": "Evaluator render and journey inspection",
+      "instructionFiles": {
+        "A": null,
+        "B": "evals/arms/reliable-engineering-v0.1.md",
+        "C": "dist/reasonkit-design.md",
+        "D": null
+      },
+      "instructionSha256": {
+        "A": null,
+        "B": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+        "C": "f700fe2876b0a296d556904fc514b13a692e869a04efd172e5d9b3eb879667df",
+        "D": null
+      },
       "metrics": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "instruction_bytes",
+        "tool_calls",
+        "agent_count",
         "genericness_score",
         "visual_hierarchy",
         "identity_specificity",
         "responsive_quality",
         "interaction_purpose",
         "human_preference",
-        "tokens",
-        "agent_count",
-        "tool_calls",
-        "render_inspected"
+        "render_inspected",
+        "verification_status"
       ]
     }
   ]
