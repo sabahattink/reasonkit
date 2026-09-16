@@ -45,15 +45,17 @@ Budgets are ceilings, not targets. The governor may lower a budget when the
 task is clearer than its initial classification, but it must not silently
 raise one.
 
-| Level | Typical task | Max specialists | Max turns per specialist | Max specialist tokens |
+| Level | Typical task | Max specialists | Max turns per specialist | Max specialist output |
 | --- | --- | ---: | ---: | ---: |
 | L0 | Direct answer or deterministic lookup | 0 | 0 | 0 |
-| L1 | One bounded operation with a clear check | 1 | 1 | 3,000 |
-| L2 | Multi-step task with one meaningful seam | 2 | 2 | 4,000 |
-| L3 | Cross-cutting change or ambiguous diagnosis | 4 | 2 | 6,000 |
-| L4 | High-impact, novel, or safety-sensitive work | 6 | 3 | 8,000 |
+| L1 | One bounded operation with a clear check | 0 | 0 | 0 |
+| L2 | Multi-step task with one meaningful seam | 1 | 1 | 800 |
+| L3 | Cross-cutting change or ambiguous diagnosis | 3 | 2 | 800 |
+| L4 | High-impact, novel, or safety-sensitive work | 5 | 2 | 800 |
 
-The orchestrator owns one overall budget, keeps one adversarial pass as the
+Normal specialist output is capped at 800 tokens. Research may use at most
+1,200 and architecture at most 1,500 when the route requires it. The
+orchestrator owns one overall budget, keeps one adversarial pass as the
 default maximum, and stops when the acceptance condition is met. L4 work also
 requires an explicit human gate before high-impact or RED actions.
 
@@ -61,6 +63,8 @@ requires an explicit human gate before high-impact or RED actions.
 
 1. Load skill/SKILL.md as the orchestration instruction.
 2. Classify the task with core/task-router.md and set the L0-L4 ceiling.
+   Keep L0 inline, use only a compact route for L1, and create a structured
+   route record from L2 onward.
 3. Select one protocol from protocols/ and gather the minimum useful evidence.
 4. Compose only the specialists needed for the unresolved seams.
 5. Execute through the available adapter and tools.
@@ -79,6 +83,27 @@ The default result contract is:
 | Residual unknowns | What remains unverified |
 | Stop reason | Why the loop ended or what gate is needed |
 
+## Use it in five minutes
+
+1. Choose the host surface: ChatGPT, Codex, Claude Code, or a generic
+   system-prompt host.
+2. Copy or load the matching file under adapters/, or use
+   dist/reasonkit-min.md when context is tight.
+3. Give the host one task, its constraints, and the expected outcome.
+4. Let ReasonKit route internally; do not manually load every core file.
+5. Inspect the returned status, evidence, verification, and stop reason.
+
+Example task:
+
+> Diagnose why the focused test fails after the smallest relevant repository
+> change. Do not modify unrelated files. Return the confirmed cause, patch,
+> checks, and any unverified runtime state.
+
+The expected interaction is a compact route, direct evidence, a bounded
+specialist only if needed, execution, and an independently verified result.
+Measured token or quality comparisons belong to evals/ and will not be
+invented in this README.
+
 ## Repository map
 
 | Path | Purpose |
@@ -89,6 +114,8 @@ The default result contract is:
 | protocols/ | Task-shaped execution sequences |
 | taste/ | Creative quality and critique checks |
 | adapters/ | Provider-neutral integration placeholders |
+| dist/ | Generated full and compact copy/load bundles |
+| scripts/ | Deterministic bundle, validation, and benchmark helpers |
 | evals/ | Evaluation contract and future scenario families |
 
 ## Design rules
@@ -128,9 +155,10 @@ standard.
 
 ## Status
 
-Version 0.1.0 is an initial public scaffold. It defines the contracts and
-prompts; it does not claim provider integrations, benchmark results, or
-production deployment.
+Version 0.1.0 is still unreleased. The current main branch contains the
+release-preparation surface: prompt-pack adapters, generated bundles, a
+benchmark manifest and runner, and validation CI. It does not claim provider
+runtime integrations, benchmark results, or production deployment.
 
 ## License
 

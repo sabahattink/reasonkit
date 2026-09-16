@@ -1,6 +1,8 @@
-# ChatGPT Adapter Placeholder
+# ChatGPT Adapter
 
-This directory reserves the seam for a ChatGPT-based adapter.
+This directory contains the first working copy/load adapter for a ChatGPT
+host. Start with SKILL.md, then load dist/reasonkit.md or the compact
+dist/reasonkit-min.md bundle.
 
 ## Required interface
 
@@ -9,7 +11,7 @@ their risk classes, preserve the L0-L4 and token ceilings, and return the
 ReasonKit result contract. Provider-specific behavior belongs here, not in
 core/ or protocols/.
 
-## Not implemented in v0.1
+## Scope
 
-No ChatGPT API, account, model, pricing, or benchmark claim is made by this
-placeholder.
+This is a prompt-pack adapter, not an API client. No ChatGPT API, account,
+model, pricing, or benchmark claim is made by this adapter.

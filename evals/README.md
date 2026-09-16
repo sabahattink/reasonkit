@@ -41,3 +41,34 @@ Score the process on:
 No benchmark scores are claimed in v0.1. A future executable harness should
 store raw observations and evaluator reasoning, not only a single aggregate
 number.
+
+## First A/B/C/D run
+
+The first comparison is defined in benchmark.json:
+
+- A: Luna vanilla.
+- B: Luna plus evaluator-supplied Reliable Engineering v0.1.
+- C: Luna plus the generated ReasonKit bundle.
+- D: Astra vanilla.
+
+Prepare all eight session packets with:
+
+    powershell -File scripts/run-benchmark.ps1 -PrepareAll
+
+To run one externally configured host command, provide its executable and
+arguments:
+
+    powershell -File scripts/run-benchmark.ps1 -Case TASK-001 -Arm C -Command node -ArgumentList evals/debugging/fixtures/task-001/parser.test.js
+
+The runner captures the task, arm condition, instruction bundle, raw output,
+and a metrics template. It does not call a provider API and does not invent
+tokens, quality, agent count, or tool-call data. Do not publish a release or a
+quality graph until raw outputs and verification records exist.
+
+## Reporting
+
+Once runs are verified, plot quality on the vertical axis and generated tokens
+on the horizontal axis. Keep A, B, C, and D visible as separate points and
+include agent count, tool calls, verification status, and evaluator notes
+alongside the plot. A missing metric remains missing; it is not replaced with a
+model estimate.

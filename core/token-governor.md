@@ -8,17 +8,28 @@ optimizes for reliable decisions, not maximum output length.
 These are total soft ceilings for a run. The actual adapter may impose a lower
 limit.
 
-| Level | Total run tokens | Evidence | Synthesis and execution | Verification |
+| Level | Default run tokens | Evidence | Synthesis and execution | Verification |
 | --- | ---: | ---: | ---: | ---: |
-| L0 | 4,000 | 1,500 | 1,500 | 1,000 |
-| L1 | 8,000 | 2,500 | 3,500 | 2,000 |
-| L2 | 16,000 | 5,000 | 7,000 | 4,000 |
-| L3 | 32,000 | 10,000 | 14,000 | 8,000 |
-| L4 | 48,000 | 15,000 | 21,000 | 12,000 |
+| L0 | 1,200 | 300 | 600 | 300 |
+| L1 | 2,500 | 600 | 1,400 | 500 |
+| L2 | 6,000 | 1,400 | 3,200 | 1,400 |
+| L3 | 12,000 | 3,000 | 6,500 | 2,500 |
+| L4 | 20,000 | 5,000 | 11,000 | 4,000 |
 
-The table is a ceiling and planning aid. The complexity governor caps each
-specialist separately; unused specialist budget does not become permission to
-start more specialists.
+The table is a default ceiling and planning aid. An explicit escalation may
+use up to 48,000 total tokens only when the route records the reason, the
+additional acceptance value, and the required human gate. 48,000 is never a
+default L4 allowance. The complexity governor caps each specialist separately;
+unused specialist budget does not become permission to start more specialists.
+
+## Specialist output classes
+
+- Normal specialists: 400-800 tokens, with 800 as the hard ceiling.
+- Research specialists: at most 1,200 tokens.
+- Architecture specialists: at most 1,500 tokens.
+
+The output ceiling includes the return, not a license to repeat the evidence
+provided by the hub.
 
 ## Allocation rules
 
@@ -42,6 +53,8 @@ Context should move through four layers:
 
 If the next specialist needs more context, expand one layer at a time and
 state why. Do not dump the full conversation as a substitute for routing.
+L0 runs inline and L1 uses a compact route only when useful; do not spend a
+structured route record on trivial work.
 
 ## Pressure signals
 

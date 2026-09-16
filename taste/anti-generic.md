@@ -5,6 +5,9 @@ default patterns. They are diagnostic, not a ban on simplicity.
 
 ## Before production
 
+- Treat the first creative idea as disposable.
+- For L2 or higher creative work, generate at most three genuinely different
+  theses. Variants of the same layout do not count.
 - Can the work be described by one specific idea rather than a style label?
 - Is there a reference, material, place, behavior, or constraint that gives it
   a point of view?
@@ -29,6 +32,14 @@ Generic gradients, interchangeable hero copy, decorative cards without
 hierarchy, arbitrary glass effects, random cursor motion, unexplained live
 telemetry, copied reference layouts, and a visual "pass" based only on source
 inspection.
+
+Ask the hard rejection question:
+
+> Could this design belong to 1,000 other developers without meaningful
+> changes?
+
+If yes, reject the direction or name the specific change that gives it a
+defensible point of view.
 
 ## Decision
 

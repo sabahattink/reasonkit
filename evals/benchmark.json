@@ -1,0 +1,69 @@
+{
+  "version": "0.1",
+  "name": "ReasonKit A/B/C/D baseline",
+  "description": "A repeatable case and metric manifest. The runner never invents model results.",
+  "arms": [
+    {
+      "id": "A",
+      "name": "Luna vanilla",
+      "model": "Luna",
+      "condition": "No orchestration or engineering instruction pack.",
+      "instructionFile": null
+    },
+    {
+      "id": "B",
+      "name": "Luna plus Reliable Engineering v0.1",
+      "model": "Luna",
+      "condition": "Evaluator-supplied Reliable Engineering v0.1 baseline; record its exact source and version.",
+      "instructionFile": null
+    },
+    {
+      "id": "C",
+      "name": "Luna plus ReasonKit",
+      "model": "Luna",
+      "condition": "Load the generated ReasonKit distribution bundle.",
+      "instructionFile": "dist/reasonkit.md"
+    },
+    {
+      "id": "D",
+      "name": "Astra vanilla",
+      "model": "Astra",
+      "condition": "No orchestration or engineering instruction pack.",
+      "instructionFile": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "TASK-001",
+      "title": "Debug a small repository parser regression",
+      "promptFile": "evals/debugging/TASK-001.md",
+      "verificationCommand": "node evals/debugging/fixtures/task-001/parser.test.js",
+      "metrics": [
+        "task_success",
+        "tokens",
+        "agent_count",
+        "tool_calls",
+        "duration_seconds",
+        "verification_status"
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "title": "Redesign a multidisciplinary technical portfolio",
+      "promptFile": "evals/creative/TASK-002.md",
+      "verificationCommand": "Evaluator render and journey inspection",
+      "metrics": [
+        "genericness_score",
+        "visual_hierarchy",
+        "identity_specificity",
+        "responsive_quality",
+        "interaction_purpose",
+        "human_preference",
+        "tokens",
+        "agent_count",
+        "tool_calls",
+        "render_inspected"
+      ]
+    }
+  ]
+}

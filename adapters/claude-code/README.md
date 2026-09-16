@@ -1,6 +1,7 @@
-# Claude Code Adapter Placeholder
+# Claude Code Adapter
 
-This directory reserves the seam for a Claude Code-based adapter.
+This directory contains the copy/load surface for a Claude Code host. Start
+with SKILL.md and load the generated bundle from dist/.
 
 ## Required interface
 
@@ -9,6 +10,7 @@ specialist calls, tool permissions, verification result, and stop policy onto
 the host environment. It must keep the hub-and-spoke topology and expose
 provider-specific details only inside this adapter.
 
-## Not implemented in v0.1
+## Scope
 
-No Claude Code integration or capability claim is made by this placeholder.
+This is a prompt-pack adapter, not a provider runtime. No Claude Code
+integration or capability claim is made beyond the documented loading seam.

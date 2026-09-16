@@ -1,6 +1,7 @@
-# Generic Adapter Placeholder
+# Generic Adapter
 
-This directory reserves the provider-neutral adapter seam.
+This directory contains the provider-neutral system-prompt surface. Start with
+SYSTEM.md or load the generated bundle from dist/.
 
 ## Minimal host contract
 
@@ -16,6 +17,7 @@ The host must be able to:
 The host may be a model, an application, or a local workflow. Provider
 capabilities must remain explicit and must not leak into the ReasonKit core.
 
-## Not implemented in v0.1
+## Scope
 
-This is an interface placeholder, not a working adapter.
+The host remains responsible for model calls, tools, permissions, and
+execution. ReasonKit supplies the routing and verification contract.

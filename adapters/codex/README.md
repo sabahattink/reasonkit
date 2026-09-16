@@ -1,6 +1,7 @@
-# Codex Adapter Placeholder
+# Codex Adapter
 
-This directory reserves the seam for a Codex-based adapter.
+This directory contains the copy/load surface for a Codex host. Start with
+SKILL.md and load the generated bundle from dist/.
 
 ## Required interface
 
@@ -8,6 +9,7 @@ An implementation should preserve the ReasonKit route record, specialist
 ceilings, tool-before-tokens rule, Computer Use tiers, visual inspection gate,
 and final result contract while mapping them to Codex task and tool surfaces.
 
-## Not implemented in v0.1
+## Scope
 
-No Codex integration or runtime claim is made by this placeholder.
+This is a prompt-pack adapter, not a Codex runtime implementation. No model or
+runtime capability claim is made by this adapter.

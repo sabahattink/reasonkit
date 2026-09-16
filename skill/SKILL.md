@@ -15,7 +15,8 @@ independently, and stop.
 1. Read the requested outcome, hard constraints, current evidence, tools, and
    acceptance condition.
 2. Classify L0-L4 with core/task-router.md and
-   core/complexity-governor.md.
+   core/complexity-governor.md. Keep L0 inline, use a compact route for L1,
+   and create a structured route record from L2 onward.
 3. Select one primary protocol from protocols/.
 4. Use tools and direct evidence before spending more tokens.
 5. Pass progressive context: task, relevant evidence, decision, compact
@@ -30,16 +31,18 @@ independently, and stop.
 
 ## Default ceilings
 
-| Level | Specialists | Turns each | Tokens each |
+| Level | Specialists | Turns each | Default output |
 | --- | ---: | ---: | ---: |
 | L0 | 0 | 0 | 0 |
-| L1 | 1 | 1 | 3,000 |
-| L2 | 2 | 2 | 4,000 |
-| L3 | 4 | 2 | 6,000 |
-| L4 | 6 | 3 | 8,000 |
+| L1 | 0 | 0 | 0 |
+| L2 | 1 | 1 | 800 |
+| L3 | 3 | 2 | 800 |
+| L4 | 5 | 2 | 800 |
 
 These are maximums. They are not a target and cannot be silently increased.
-The overall run budget is governed by core/token-governor.md.
+Normal specialists are capped at 800 output tokens; research is capped at
+1,200 and architecture at 1,500. The overall run budget is governed by
+core/token-governor.md, where 48,000 is reserved for explicit escalation.
 
 ## Compact assignment prompt
 

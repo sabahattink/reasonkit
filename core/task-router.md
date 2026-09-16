@@ -22,9 +22,17 @@ The router receives:
 5. Select one primary protocol.
 6. Name the minimum unresolved questions.
 7. Compose specialists only for those questions.
-8. Record a route before execution.
+8. Record a route before execution when the level is L2 or higher.
 
-## Route record
+## Route overhead
+
+Routing must not become its own bureaucracy.
+
+- L0: route inline in the answer; no explicit route record.
+- L1: use a compact route only when it changes the action.
+- L2-L4: create the structured route record below.
+
+## Structured route record
 
 | Field | Required content |
 | --- | --- |
