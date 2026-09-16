@@ -8,7 +8,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $dist = Join-Path $root 'dist'
 $fullPath = Join-Path $dist 'reasonkit.md'
 $minPath = Join-Path $dist 'reasonkit-min.md'
-$newLine = [Environment]::NewLine
+$newLine = [string][char]10
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Read-ReasonKitFile {

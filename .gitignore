@@ -15,7 +15,6 @@ Desktop.ini
 !.env.example
 
 # Build and test output
-dist/
 build/
 coverage/
 tmp/
