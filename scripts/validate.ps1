@@ -47,6 +47,8 @@ try {
     'docs/REASONKIT-V0.2-DESIGN-RESEARCH-SPEC.md',
     'core/telemetry.schema.json',
     'core/candidate-manifest.schema.json',
+    'core/tiny-kernel.md',
+    'dist/v0.2/reasonkit-kernel.md',
     'scripts/build-dist.ps1',
     'scripts/run-benchmark.ps1',
     'scripts/test-v02.ps1'
@@ -140,6 +142,11 @@ try {
   & .\scripts\build-dist.ps1 -Check
   if (-not $?) {
     throw 'Generated distribution is stale.'
+  }
+
+  & .\scripts\build-dist.ps1 -V02Kernel -Check
+  if (-not $?) {
+    throw 'Generated v0.2 Tiny Kernel is stale.'
   }
 
   $null = @(

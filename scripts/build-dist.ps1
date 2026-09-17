@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [switch]$Check
+  [switch]$Check,
+  [switch]$V02Kernel
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +29,120 @@ function Normalize-ReasonKitText {
     '$1'
   )
   return $normalized.TrimEnd([char]13, [char]10) + $newLine
+}
+
+function Get-PythonExecutable {
+  foreach ($name in @('python', 'python3', 'py')) {
+    $command = Get-Command $name -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+      return $command.Source
+    }
+  }
+  throw 'No Python executable is available for the pinned tokenizer.'
+}
+
+function Get-TokenizerVersion {
+  param([string]$Python)
+
+  $output = @(
+    & $Python -c "import importlib.metadata as m; print(m.version('tiktoken'))" 2>&1 |
+      ForEach-Object { $_.ToString() }
+  )
+  if ($LASTEXITCODE -ne 0) {
+    throw ('Pinned tokenizer package is unavailable: ' + ($output -join ' '))
+  }
+  return (($output | Select-Object -Last 1).ToString().Trim())
+}
+
+function Get-TokenizerEstimate {
+  param(
+    [string]$Text,
+    [string]$Python
+  )
+
+  $temporaryPath = Join-Path ([IO.Path]::GetTempPath()) ('reasonkit-v02-kernel-token-' + [Guid]::NewGuid().ToString('N') + '.txt')
+  [IO.File]::WriteAllText($temporaryPath, $Text, $utf8NoBom)
+  try {
+    $code = "import pathlib,sys,tiktoken; data=pathlib.Path(sys.argv[1]).read_bytes().decode('utf-8'); enc=tiktoken.get_encoding('cl100k_base'); print(len(enc.encode(data, disallowed_special=())))"
+    $output = @(
+      & $Python -c $code $temporaryPath 2>&1 |
+        ForEach-Object { $_.ToString() }
+    )
+    if ($LASTEXITCODE -ne 0) {
+      throw ('Tokenizer estimate failed: ' + ($output -join ' '))
+    }
+    $estimate = (($output | Select-Object -Last 1).ToString().Trim())
+    if ($estimate -notmatch '^[0-9]+$') {
+      throw ('Tokenizer returned a non-numeric estimate: ' + $estimate)
+    }
+    return [int]$estimate
+  }
+  finally {
+    Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Get-ByteSha256 {
+  param([byte[]]$Bytes)
+
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString($sha.ComputeHash($Bytes)) -replace '-', '').ToLowerInvariant()
+  }
+  finally {
+    $sha.Dispose()
+  }
+}
+
+function Invoke-V02KernelBuild {
+  $sourcePath = Join-Path $root 'core/tiny-kernel.md'
+  $artifactPath = Join-Path $dist 'v0.2/reasonkit-kernel.md'
+  if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+    throw 'Missing Tiny Kernel source: core/tiny-kernel.md'
+  }
+
+  $sourceText = Normalize-ReasonKitText ([IO.File]::ReadAllText($sourcePath))
+  $sourceBytes = $utf8NoBom.GetBytes($sourceText)
+  if ($sourceBytes.Length -gt 8000) {
+    throw ('Tiny Kernel exceeds the UTF-8 byte budget: ' + $sourceBytes.Length)
+  }
+
+  $python = Get-PythonExecutable
+  $tokenizerVersion = Get-TokenizerVersion -Python $python
+  if ($tokenizerVersion -ne '0.14.0') {
+    throw ('Tokenizer version mismatch. Expected 0.14.0, got ' + $tokenizerVersion)
+  }
+  $tokenEstimate = Get-TokenizerEstimate -Text $sourceText -Python $python
+  if ($tokenEstimate -gt 2000) {
+    throw ('Tiny Kernel exceeds the build-estimate token budget: ' + $tokenEstimate)
+  }
+
+  if ($Check) {
+    if (-not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) {
+      throw 'Generated Tiny Kernel artifact is missing: dist/v0.2/reasonkit-kernel.md'
+    }
+    $artifactBytes = [IO.File]::ReadAllBytes($artifactPath)
+    if ([Convert]::ToBase64String($artifactBytes) -cne [Convert]::ToBase64String($sourceBytes)) {
+      throw 'Generated Tiny Kernel is not byte-identical to the normalized source.'
+    }
+    Write-Output 'v0.2 Tiny Kernel check passed'
+  }
+  else {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $artifactPath) | Out-Null
+    [IO.File]::WriteAllBytes($artifactPath, $sourceBytes)
+    Write-Output ('wrote ' + $artifactPath)
+  }
+
+  Write-Output ('kernel_sha256=' + (Get-ByteSha256 -Bytes $sourceBytes))
+  Write-Output ('kernel_utf8_bytes=' + $sourceBytes.Length)
+  Write-Output ('kernel_build_estimate_tokens=' + $tokenEstimate)
+  Write-Output 'tokenizer=tiktoken/0.14.0/cl100k_base'
+  Write-Output 'tokenizer_measurement=build_estimate'
+}
+
+if ($V02Kernel) {
+  Invoke-V02KernelBuild
+  return
 }
 
 function Build-ReasonKitBundle {

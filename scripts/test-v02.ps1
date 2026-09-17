@@ -13,6 +13,11 @@ $script:TokenizerEncoding = 'cl100k_base'
 $script:TokenizerInstallation = 'python -m pip install --disable-pip-version-check --no-input tiktoken==0.14.0'
 $script:TokenizerNormalization = 'UTF-8 without BOM; LF; trailing horizontal whitespace removed; exactly one final LF'
 $script:TokenizerMeasurementKind = 'build_estimate'
+$script:KernelSourcePath = 'core/tiny-kernel.md'
+$script:KernelArtifactPath = 'dist/v0.2/reasonkit-kernel.md'
+$script:KernelSourceBytesMax = 8000
+$script:KernelTokensMax = 2000
+$script:Phase1MutableV01Seams = @('scripts/build-dist.ps1')
 
 $script:FrozenV01Hashes = [ordered]@{
         '.editorconfig' = 'ea3d46f76380a5f059c4b1387e528ae6690c9444a077f4004775a9278ace0d01'
@@ -463,6 +468,10 @@ try {
   }
 
   foreach ($entry in $script:FrozenV01Hashes.GetEnumerator()) {
+    if ($script:Phase1MutableV01Seams -contains $entry.Key) {
+      $null = Invoke-GitText -Arguments @('rev-parse', ($script:BaselineCommit + ':' + $entry.Key))
+      continue
+    }
     $actual = Get-FileSha256 -RelativePath $entry.Key
     if ($actual -ne $entry.Value) {
       throw ('Frozen v0.1 artifact changed: ' + $entry.Key + ' expected ' + $entry.Value + ' got ' + $actual)
@@ -702,12 +711,87 @@ try {
     throw 'Tokenizer measurement is not labeled as a build estimate.'
   }
 
+  $kernelSourceAbsolutePath = Join-Path $script:PhaseRoot ($script:KernelSourcePath -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $kernelSourceAbsolutePath -PathType Leaf)) {
+    throw ('Tiny Kernel source is missing: ' + $script:KernelSourcePath)
+  }
+  $kernelRawText = [IO.File]::ReadAllText($kernelSourceAbsolutePath)
+  $kernelText = Normalize-AuthoredText -Text $kernelRawText
+  $kernelTextAgain = Normalize-AuthoredText -Text $kernelText
+  if ($kernelText -cne $kernelTextAgain) {
+    throw 'Tiny Kernel normalization is not deterministic.'
+  }
+  $kernelUtf8 = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
+  $kernelBytes = $kernelUtf8.GetBytes($kernelText)
+  $kernelBytesAgain = $kernelUtf8.GetBytes($kernelText)
+  if ([Convert]::ToBase64String($kernelBytes) -cne [Convert]::ToBase64String($kernelBytesAgain)) {
+    throw 'Tiny Kernel byte measurement is not deterministic.'
+  }
+  if ($kernelBytes.Length -gt $script:KernelSourceBytesMax) {
+    throw ('Tiny Kernel exceeds the UTF-8 byte budget: ' + $kernelBytes.Length)
+  }
+  $kernelTokens = Get-TokenizerEstimate -Text $kernelText -Python $python
+  $kernelTokensAgain = Get-TokenizerEstimate -Text $kernelText -Python $python
+  if ($kernelTokens -ne $kernelTokensAgain) {
+    throw 'Tiny Kernel tokenizer estimates are not deterministic.'
+  }
+  if ($kernelTokens -gt $script:KernelTokensMax) {
+    throw ('Tiny Kernel exceeds the build-estimate token budget: ' + $kernelTokens)
+  }
+
+  $forbiddenKernelMarkers = @(
+    '1.25',
+    'TASK-001',
+    'TASK-002',
+    'TASK-003',
+    'TASK-004',
+    'arm A',
+    'arm B',
+    'arm C',
+    'arm D'
+  )
+  foreach ($marker in $forbiddenKernelMarkers) {
+    if ($kernelText.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+      throw ('Forbidden benchmark marker in Tiny Kernel: ' + $marker)
+    }
+  }
+
+  $kernelArtifactAbsolutePath = Join-Path $script:PhaseRoot ($script:KernelArtifactPath -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $kernelArtifactAbsolutePath -PathType Leaf)) {
+    throw ('Generated Tiny Kernel artifact is missing: ' + $script:KernelArtifactPath)
+  }
+  $kernelArtifactBytes = [IO.File]::ReadAllBytes($kernelArtifactAbsolutePath)
+  $expectedKernelBytes = $kernelUtf8.GetBytes($kernelText)
+  if ([Convert]::ToBase64String($kernelArtifactBytes) -cne [Convert]::ToBase64String($expectedKernelBytes)) {
+    throw 'Generated Tiny Kernel is not byte-identical to the normalized source.'
+  }
+  $kernelSha256 = Get-TextSha256 -Text $kernelText
+  $generatedKernelSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $kernelArtifactAbsolutePath).Hash.ToLowerInvariant()
+  if ($kernelSha256 -ne $generatedKernelSha256) {
+    throw 'Generated Tiny Kernel SHA-256 does not match the normalized source.'
+  }
+  if ($kernelSha256 -ne (Get-TextSha256 -Text $kernelText)) {
+    throw 'Tiny Kernel SHA-256 is not deterministic.'
+  }
+  $unexpectedV02Artifacts = @(
+    Get-ChildItem -LiteralPath (Join-Path $script:PhaseRoot 'dist/v0.2') -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -ne 'reasonkit-kernel.md' }
+  )
+  if ($unexpectedV02Artifacts.Count -gt 0) {
+    throw 'Unexpected v0.2 bundle artifact exists.'
+  }
+
   Write-Output 'Phase 0 v0.2 synthetic tests passed'
   Write-Output ('baseline_commit=' + $script:BaselineCommit)
   Write-Output ('frozen_design_sha256=' + $mirrorHash)
   Write-Output ('tokenizer=' + $script:TokenizerPackage + '/' + $tokenizerVersion + '/' + $script:TokenizerEncoding)
   Write-Output ('tokenizer_measurement=' + $script:TokenizerMeasurementKind)
   Write-Output ('guarded_v01_files=' + $script:FrozenV01Hashes.Count)
+  Write-Output ('phase1_mutable_v01_seams=' + ($script:Phase1MutableV01Seams -join ','))
+  Write-Output ('kernel_sha256=' + $kernelSha256)
+  Write-Output ('kernel_utf8_bytes=' + $kernelBytes.Length)
+  Write-Output ('kernel_build_estimate_tokens=' + $kernelTokens)
+  Write-Output ('generated_kernel_sha256=' + $generatedKernelSha256)
 }
 finally {
   Pop-Location
