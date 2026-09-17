@@ -44,8 +44,12 @@ try {
     'evals/creative/fixtures/task-002/public/mark.svg',
     'evals/creative/fixtures/task-002/public/README.md',
     'evals/creative/fixtures/task-002/acceptance.md',
+    'docs/REASONKIT-V0.2-DESIGN-RESEARCH-SPEC.md',
+    'core/telemetry.schema.json',
+    'core/candidate-manifest.schema.json',
     'scripts/build-dist.ps1',
-    'scripts/run-benchmark.ps1'
+    'scripts/run-benchmark.ps1',
+    'scripts/test-v02.ps1'
   )
 
   function Resolve-PreparedRun {
@@ -77,7 +81,8 @@ try {
 
   $contentFiles = Get-ChildItem -Recurse -File | Where-Object {
     $_.FullName -notmatch '\\.git\\' -and
-    $_.FullName -notmatch '\\evals\\runs\\'
+    $_.FullName -notmatch '\\evals\\runs\\' -and
+    $_.FullName -notmatch '[\\/]docs[\\/]REASONKIT-V0.2-DESIGN-RESEARCH-SPEC\.md$'
   }
   foreach ($file in $contentFiles) {
     $content = [IO.File]::ReadAllText($file.FullName)
@@ -184,6 +189,11 @@ try {
         $null -eq $metadata.fixture_sha256) {
       throw 'Run metadata is missing instruction or fixture provenance.'
     }
+  }
+
+  & .\scripts\test-v02.ps1
+  if (-not $?) {
+    throw 'Phase 0 v0.2 synthetic tests failed.'
   }
 
   $global:LASTEXITCODE = 0

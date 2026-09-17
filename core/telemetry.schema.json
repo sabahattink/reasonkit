@@ -1,0 +1,765 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reasonkit.dev/schemas/v0.2/telemetry.schema.json",
+  "title": "ReasonKit v0.2 run telemetry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "provenance",
+    "context",
+    "specialists",
+    "outcome",
+    "provider_measurements",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.2"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "task_id",
+        "arm",
+        "candidate_id",
+        "candidate_version",
+        "candidate_manifest_sha256",
+        "telemetry_schema_version"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arm": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "candidate_version": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "candidate_manifest_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "telemetry_schema_version": {
+          "type": "string",
+          "const": "0.2"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_tag",
+        "source_commit",
+        "task_hash",
+        "fixture_hash",
+        "host_fingerprint",
+        "kernel_id",
+        "kernel_sha256",
+        "module_manifest_sha256",
+        "runner_sha256",
+        "adapter_sha256"
+      ],
+      "properties": {
+        "source_tag": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/nullableCommit"
+        },
+        "task_hash": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "fixture_hash": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "host_fingerprint": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "kernel_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "kernel_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "module_manifest_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "runner_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "adapter_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kernel_bytes",
+        "kernel_tokens",
+        "loader_index_bytes",
+        "loader_index_tokens",
+        "loader_request_count",
+        "loader_decision_duration_ms",
+        "route",
+        "selected_complexity",
+        "modules_loaded",
+        "omitted_context",
+        "full_bundle",
+        "instruction_bytes"
+      ],
+      "properties": {
+        "kernel_bytes": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "kernel_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "loader_index_bytes": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "loader_index_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "loader_request_count": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "loader_decision_duration_ms": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        },
+        "route": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "selected_complexity": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4",
+            null
+          ]
+        },
+        "modules_loaded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/moduleLoad"
+          }
+        },
+        "omitted_context": {
+          "$ref": "#/$defs/omittedContext"
+        },
+        "full_bundle": {
+          "$ref": "#/$defs/fullBundle"
+        },
+        "instruction_bytes": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        }
+      }
+    },
+    "specialists": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specialist_gate",
+        "specialist_roles",
+        "specialist_count",
+        "specialist_reports"
+      ],
+      "properties": {
+        "specialist_gate": {
+          "$ref": "#/$defs/specialistGate"
+        },
+        "specialist_roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "specialist_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "specialist_reports": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/specialistReport"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verification",
+        "stop",
+        "provider_status",
+        "model_completion_status",
+        "task_success",
+        "scope_violation",
+        "evaluator_validity",
+        "changed_files",
+        "tests_weakened",
+        "dependencies_changed",
+        "failure_class"
+      ],
+      "properties": {
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "stop": {
+          "$ref": "#/$defs/stop"
+        },
+        "provider_status": {
+          "type": "string",
+          "enum": [
+            "COMPLETED",
+            "ABORTED",
+            "UNKNOWN"
+          ]
+        },
+        "model_completion_status": {
+          "type": "string",
+          "enum": [
+            "COMPLETED",
+            "NOT_STARTED",
+            "ABORTED",
+            "UNKNOWN"
+          ]
+        },
+        "task_success": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scope_violation": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "evaluator_validity": {
+          "type": "string",
+          "enum": [
+            "VALID",
+            "INVALID",
+            "NOT_APPLICABLE",
+            "UNKNOWN"
+          ]
+        },
+        "changed_files": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tests_weakened": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dependencies_changed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failure_class": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "MODEL_FAIL",
+            "EVALUATOR_INVALID",
+            "PROVIDER_ABORTED",
+            null
+          ]
+        }
+      }
+    },
+    "provider_measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "tool_calls",
+        "agent_count",
+        "duration_seconds"
+      ],
+      "properties": {
+        "input_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        },
+        "cached_input_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        },
+        "reasoning_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        },
+        "total_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeNumber",
+          "description": "Provider-reported only; never derived from other fields."
+        },
+        "tool_calls": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "agent_count": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "duration_seconds": {
+          "$ref": "#/$defs/nullableNonNegativeNumber"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_dirty",
+        "raw_packet_sha256",
+        "telemetry_sha256",
+        "historical_materials_unchanged",
+        "integrity_status"
+      ],
+      "properties": {
+        "source_dirty": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "raw_packet_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "telemetry_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "historical_materials_unchanged": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "integrity_status": {
+          "type": "string",
+          "enum": [
+            "UNVERIFIED",
+            "VALID",
+            "INVALID"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nullableHash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "nullableCommit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-fA-F]{40}$"
+    },
+    "nullableNonNegativeInt": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "nullableNonNegativeNumber": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "moduleReuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reused",
+        "count",
+        "scope",
+        "reason"
+      ],
+      "properties": {
+        "reused": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "none",
+            "same_run",
+            "host_cache",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "moduleLoad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_id",
+        "module_sha256",
+        "module_bytes",
+        "module_tokens",
+        "load_reason",
+        "load_phase",
+        "module_reuse",
+        "load_action",
+        "previous_sha256",
+        "reload_reason",
+        "context_injected"
+      ],
+      "properties": {
+        "module_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "module_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "module_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "load_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "load_phase": {
+          "type": "string",
+          "enum": [
+            "classification",
+            "evidence",
+            "specialist",
+            "verification",
+            "other"
+          ]
+        },
+        "module_reuse": {
+          "$ref": "#/$defs/moduleReuse"
+        },
+        "load_action": {
+          "type": "string",
+          "enum": [
+            "loaded",
+            "reused",
+            "reloaded"
+          ]
+        },
+        "previous_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "reload_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context_injected": {
+          "type": "boolean"
+        }
+      }
+    },
+    "omittedContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_manifest_sha256",
+        "module_ids",
+        "bytes",
+        "tokens",
+        "derivation",
+        "status"
+      ],
+      "properties": {
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "module_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "bytes": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "tokens": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "derivation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "derived",
+            "unavailable",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "fullBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loaded",
+        "escalation_reason",
+        "requested_by",
+        "approved_by_or_gate",
+        "source_hash",
+        "loaded_bytes",
+        "loaded_tokens_if_deterministic"
+      ],
+      "properties": {
+        "loaded": {
+          "type": "boolean"
+        },
+        "escalation_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approved_by_or_gate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_hash": {
+          "$ref": "#/$defs/nullableHash"
+        },
+        "loaded_bytes": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        },
+        "loaded_tokens_if_deterministic": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        }
+      }
+    },
+    "specialistGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "considered",
+        "started",
+        "trigger",
+        "evidence_state",
+        "competing_hypotheses",
+        "rejection_reason",
+        "role"
+      ],
+      "properties": {
+        "considered": {
+          "type": "boolean"
+        },
+        "started": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "competing_hypotheses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejection_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "specialistReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "evidence_refs",
+        "conclusion",
+        "residual_risk",
+        "recommended_next_action",
+        "report_tokens"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "conclusion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "residual_risk": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recommended_next_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_tokens": {
+          "$ref": "#/$defs/nullableNonNegativeInt"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "evidence"
+      ],
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_RUN",
+            "INVALID",
+            "UNKNOWN"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reason"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "STOP",
+            "CONTINUE",
+            "ESCALATE",
+            "UNKNOWN"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
