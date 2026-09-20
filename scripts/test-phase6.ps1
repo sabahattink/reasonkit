@@ -215,6 +215,35 @@ function Invoke-FinalCandidateAcceptance {
     -SchemaPath (Join-Path $root 'core/candidate-manifest.schema.json') `
     -ManifestText $manifestText
 
+  $finalPacket = Get-PreparedPacket -Result (Invoke-Runner -Parameters @{
+    Profile = 'v0.2'
+    CandidateManifestPath = $candidatePath
+    BenchmarkManifestPath = $manifestPath
+    Case = 'TASK-003'
+    Arm = 'C'
+    OutputRoot = $outputRootName
+  })
+  $finalMetadata = Get-Content -Raw -LiteralPath (Join-Path $finalPacket.FullName 'run.json') | ConvertFrom-Json -Depth 80
+  $finalPlanText = Get-Content -Raw -LiteralPath (Join-Path $finalPacket.FullName 'context-plan.json')
+  $finalPlan = $finalPlanText | ConvertFrom-Json -Depth 80
+  if ($finalMetadata.candidate_id -cne $manifest.candidate_id -or
+      $finalMetadata.candidate_version -cne $manifest.candidate_version -or
+      $finalMetadata.candidate_manifest_sha256 -cne $manifest.candidate_manifest_sha256 -or
+      $finalMetadata.instruction_file -ne 'dist/v0.2/reasonkit-kernel.md' -or
+      $finalMetadata.v02_binding.adapter_path -ne 'adapters/generic/SYSTEM.md' -or
+      $finalMetadata.v02_binding.adapter_sha256 -ne $task3.v02Binding.adapterSha256 -or
+      $finalMetadata.v02_binding.kernel_sha256 -ne $task3.v02Binding.kernelSha256 -or
+      $finalMetadata.v02_binding.registry_sha256 -ne $task3.v02Binding.registrySha256 -or
+      $finalMetadata.v02_binding.implementation_sha256 -ne $task3.v02Binding.implementationSha256 -or
+      $finalMetadata.v02_binding.full_bundle_fallback -ne $false -or
+      $finalPlan.binding.adapter_path -ne 'adapters/generic/SYSTEM.md' -or
+      $finalPlan.binding.kernel_path -ne 'dist/v0.2/reasonkit-kernel.md' -or
+      $finalPlan.binding.full_bundle_fallback -ne $false -or
+      $finalPlan.binding.implementation_sha256 -ne $task3.v02Binding.implementationSha256 -or
+      $finalPlanText -match 'dist/reasonkit-debugging\.md') {
+    throw 'Final candidate Arm C binding is not explicit or deterministic.'
+  }
+
   $mutationRoot = Join-Path $testRoot 'final-candidate-mutation-repo'
   New-Item -ItemType Directory -Force -Path $mutationRoot | Out-Null
   foreach ($entry in @($manifest.covered_files)) {

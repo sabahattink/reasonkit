@@ -170,6 +170,36 @@ function Get-SourceDirty {
   return ($status.Count -gt 0)
 }
 
+function Assert-CandidateSourceCommitBinding {
+  param(
+    [string]$CandidateSourceCommit,
+    [string]$CheckoutCommit
+  )
+
+  if ($CandidateSourceCommit -ceq $CheckoutCommit) {
+    return
+  }
+
+  $global:LASTEXITCODE = 0
+  $null = @(& git -C $root merge-base --is-ancestor $CandidateSourceCommit $CheckoutCommit 2>$null)
+  $ancestorExitCode = $LASTEXITCODE
+  $global:LASTEXITCODE = 0
+  if ($ancestorExitCode -ne 0) {
+    throw 'Candidate source_commit is not an ancestor of the checkout.'
+  }
+
+  $global:LASTEXITCODE = 0
+  $changes = @(
+    & git -C $root diff --name-status --no-renames ($CandidateSourceCommit + '..' + $CheckoutCommit) 2>$null |
+      ForEach-Object { $_.ToString().Trim() }
+  )
+  $global:LASTEXITCODE = 0
+  $expectedChange = 'A' + [string][char]9 + 'dist/v0.2/candidate-manifest.json'
+  if ($changes.Count -ne 1 -or $changes[0] -cne $expectedChange) {
+    throw 'Candidate source_commit differs from checkout without a manifest-only freeze commit.'
+  }
+}
+
 function Resolve-InputPath {
   param([string]$Path)
 
@@ -231,10 +261,12 @@ function Read-V02CandidateBinding {
   if ([string]::IsNullOrWhiteSpace($sourceCommit)) {
     throw 'Cannot bind a candidate without a source commit.'
   }
+  Assert-CandidateSourceCommitBinding `
+    -CandidateSourceCommit ([string]$candidateManifest.source_commit).ToLowerInvariant() `
+    -CheckoutCommit $sourceCommit.ToLowerInvariant()
   $null = Assert-ReasonKitCandidateManifest `
     -Manifest $candidateManifest `
     -RepositoryRoot $root `
-    -ExpectedSourceCommit $sourceCommit `
     -SchemaPath (Join-Path $root 'core/candidate-manifest.schema.json') `
     -ManifestText $manifestText
 
