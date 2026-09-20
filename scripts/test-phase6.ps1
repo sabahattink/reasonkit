@@ -168,7 +168,17 @@ function Invoke-FinalCandidateAcceptance {
 
   $expectedSourceCommit = $ExpectedCandidateSourceCommit
   if ([string]::IsNullOrWhiteSpace($expectedSourceCommit)) {
-    $expectedSourceCommit = Invoke-GitText -RepositoryRoot $root -Arguments @('rev-parse', 'HEAD^')
+    $headCommit = Invoke-GitText -RepositoryRoot $root -Arguments @('rev-parse', 'HEAD')
+    $parentCommit = Invoke-GitText -RepositoryRoot $root -Arguments @('rev-parse', 'HEAD^')
+    if ($manifest.source_commit -eq $headCommit) {
+      $expectedSourceCommit = $headCommit
+    }
+    elseif ($manifest.source_commit -eq $parentCommit) {
+      $expectedSourceCommit = $parentCommit
+    }
+    else {
+      throw 'Final candidate source_commit is neither the current nor the parent commit.'
+    }
   }
   $expectedSourceCommit = $expectedSourceCommit.ToLowerInvariant()
   if ($manifest.source_commit -cne $expectedSourceCommit) {
