@@ -62,7 +62,7 @@
         "registryPath": "core/module-registry.json",
         "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
         "implementationPath": "scripts/reasonkit-v02.psm1",
-        "implementationSha256": "5caa1c31db90a72c73b4c806916e41aaacf0e553aede6c596e2e4d490a19b688",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
         "route": "coding",
         "fullBundleFallback": false
       },
@@ -122,7 +122,7 @@
         "registryPath": "core/module-registry.json",
         "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
         "implementationPath": "scripts/reasonkit-v02.psm1",
-        "implementationSha256": "5caa1c31db90a72c73b4c806916e41aaacf0e553aede6c596e2e4d490a19b688",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
         "route": "design",
         "fullBundleFallback": false
       },
@@ -186,7 +186,7 @@
         "registryPath": "core/module-registry.json",
         "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
         "implementationPath": "scripts/reasonkit-v02.psm1",
-        "implementationSha256": "5caa1c31db90a72c73b4c806916e41aaacf0e553aede6c596e2e4d490a19b688",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
         "route": "debugging",
         "fullBundleFallback": false
       },

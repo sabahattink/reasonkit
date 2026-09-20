@@ -1531,6 +1531,9 @@ function Get-RkCandidateCoverage {
   }
   foreach ($file in $generatedFiles) {
     $relative = [IO.Path]::GetRelativePath($RepositoryRoot, $file.FullName).Replace('\', '/')
+    if ($relative -ceq 'dist/v0.2/candidate-manifest.json') {
+      continue
+    }
     Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
       -RepositoryRelativePath $relative -Role 'generated_artifact'
   }

@@ -1,5 +1,10 @@
 [CmdletBinding()]
-param()
+param(
+  [Parameter(Mandatory = $false)]
+  [switch]$RequireFinalCandidate,
+  [Parameter(Mandatory = $false)]
+  [string]$ExpectedCandidateSourceCommit
+)
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).ProviderPath
@@ -115,6 +120,122 @@ function Save-ManifestVariant {
   param([object]$Manifest, [string]$Path)
 
   Write-JsonFile -Path $Path -Value $Manifest
+}
+
+function Invoke-GitText {
+  param(
+    [string]$RepositoryRoot,
+    [string[]]$Arguments
+  )
+
+  $global:LASTEXITCODE = 0
+  $lines = @(
+    & git '-c' 'safe.directory=*' '-C' $RepositoryRoot @Arguments 2>&1 |
+      ForEach-Object { $_.ToString().Trim() }
+  )
+  if ($LASTEXITCODE -ne 0) {
+    throw ('Git command failed: ' + ($Arguments -join ' '))
+  }
+  return ($lines -join $newLine).Trim()
+}
+
+function Invoke-FinalCandidateAcceptance {
+  $candidatePath = Join-Path $root 'dist/v0.2/candidate-manifest.json'
+  if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+    throw 'Final candidate manifest is missing.'
+  }
+
+  $manifestBytes = [IO.File]::ReadAllBytes($candidatePath)
+  if ($manifestBytes.Length -lt 2 -or $manifestBytes[$manifestBytes.Length - 1] -ne 0x0A) {
+    throw 'Final candidate manifest must end with exactly one LF.'
+  }
+  if ($manifestBytes.Length -ge 3 -and
+      $manifestBytes[0] -eq 0xEF -and
+      $manifestBytes[1] -eq 0xBB -and
+      $manifestBytes[2] -eq 0xBF) {
+    throw 'Final candidate manifest must be UTF-8 without BOM.'
+  }
+  if (@($manifestBytes | Where-Object { $_ -eq 0x0D }).Count -ne 0) {
+    throw 'Final candidate manifest must use LF line endings.'
+  }
+
+  $manifestText = $utf8NoBom.GetString($manifestBytes)
+  $manifest = Get-Content -Raw -LiteralPath $candidatePath | ConvertFrom-Json -Depth 80
+  if ($manifest.candidate_id -cne 'rk2-0.2.0' -or
+      $manifest.candidate_version -cne '0.2.0') {
+    throw 'Final candidate identity is not canonical.'
+  }
+
+  $expectedSourceCommit = $ExpectedCandidateSourceCommit
+  if ([string]::IsNullOrWhiteSpace($expectedSourceCommit)) {
+    $expectedSourceCommit = Invoke-GitText -RepositoryRoot $root -Arguments @('rev-parse', 'HEAD^')
+  }
+  $expectedSourceCommit = $expectedSourceCommit.ToLowerInvariant()
+  if ($manifest.source_commit -cne $expectedSourceCommit) {
+    throw 'Final candidate source_commit does not identify the frozen source commit.'
+  }
+
+  Import-Module -Name (Join-Path $root 'scripts/reasonkit-v02.psm1') -Force
+  $generated = New-ReasonKitCandidateManifest `
+    -CandidateId 'rk2-0.2.0' `
+    -CandidateVersion '0.2.0' `
+    -SourceCommit $expectedSourceCommit `
+    -RepositoryRoot $root
+  $generatedText = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $generated
+  $repeat = New-ReasonKitCandidateManifest `
+    -CandidateId 'rk2-0.2.0' `
+    -CandidateVersion '0.2.0' `
+    -SourceCommit $expectedSourceCommit `
+    -RepositoryRoot $root
+  $repeatText = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $repeat
+  $digestProjection = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $generated -ForDigest
+  if ($manifestText -cne $generatedText -or
+      $generatedText -cne $repeatText -or
+      $manifest.candidate_manifest_sha256 -cne $generated.candidate_manifest_sha256 -or
+      $generated.candidate_manifest_sha256 -cne $repeat.candidate_manifest_sha256 -or
+      $digestProjection -match 'candidate_manifest_sha256' -or
+      $manifestText -match '(?i)timestamp|hostname|run_id|[A-Za-z]:\\|"/[^/]') {
+    throw 'Final candidate manifest is not deterministic or contains forbidden identity data.'
+  }
+
+  $null = Assert-ReasonKitCandidateManifest `
+    -Manifest $manifest `
+    -RepositoryRoot $root `
+    -ExpectedSourceCommit $expectedSourceCommit `
+    -SchemaPath (Join-Path $root 'core/candidate-manifest.schema.json') `
+    -ManifestText $manifestText
+
+  $mutationRoot = Join-Path $testRoot 'final-candidate-mutation-repo'
+  New-Item -ItemType Directory -Force -Path $mutationRoot | Out-Null
+  foreach ($entry in @($manifest.covered_files)) {
+    $relative = [string]$entry.repository_relative_path
+    $sourcePath = Join-Path $root ($relative -replace '/', '\')
+    $destinationPath = Join-Path $mutationRoot ($relative -replace '/', '\')
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
+    Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+  }
+  $null = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('init', '--quiet')
+  $null = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('config', 'user.email', 'candidate-test@example.invalid')
+  $null = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('config', 'user.name', 'ReasonKit Candidate Test')
+  $null = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('add', '-A')
+  $null = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('commit', '--quiet', '-m', 'candidate mutation fixture')
+  $mutationCommit = Invoke-GitText -RepositoryRoot $mutationRoot -Arguments @('rev-parse', 'HEAD')
+  $mutationManifest = New-ReasonKitCandidateManifest `
+    -CandidateId 'rk2-0.2.0' `
+    -CandidateVersion '0.2.0' `
+    -SourceCommit $mutationCommit `
+    -RepositoryRoot $mutationRoot
+  $mutationKernelPath = Join-Path $mutationRoot 'core/tiny-kernel.md'
+  $mutationBytes = [IO.File]::ReadAllBytes($mutationKernelPath)
+  if ($mutationBytes.Length -eq 0) { throw 'Mutation fixture kernel is empty.' }
+  $mutationBytes[0] = if ($mutationBytes[0] -eq 0x23) { [byte]0x2D } else { [byte]0x23 }
+  [IO.File]::WriteAllBytes($mutationKernelPath, $mutationBytes)
+  Assert-Throws -Name 'final candidate covered-byte mutation' -Script {
+    Assert-ReasonKitCandidateManifest `
+      -Manifest $mutationManifest `
+      -RepositoryRoot $mutationRoot `
+      -ExpectedSourceCommit $mutationCommit
+  }
 }
 
 Push-Location $root
@@ -295,12 +416,19 @@ Write-Output 'phase6-provider-output'
     throw 'Post-run evaluator did not create its separate stage after provider output.'
   }
 
+  if ($RequireFinalCandidate) {
+    Invoke-FinalCandidateAcceptance
+  }
+
   Write-Output 'phase6_task003_provenance=PASS'
   Write-Output 'phase6_manifest_binding=PASS'
   Write-Output 'phase6_negative_provenance_tests=PASS'
   Write-Output 'phase6_visibility_separation=PASS'
   Write-Output 'phase6_arm_c_binding=PASS'
   Write-Output 'phase6_runner_postrun_evaluator=PASS'
+  if ($RequireFinalCandidate) {
+    Write-Output 'phase6_candidate_freeze_acceptance=PASS'
+  }
 }
 finally {
   Pop-Location

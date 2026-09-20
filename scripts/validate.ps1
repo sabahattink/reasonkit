@@ -33,6 +33,7 @@ try {
     'evals/arms/reliable-engineering-v0.1.md',
     'evals/benchmark.json',
     'evals/benchmark-v0.2.json',
+    'dist/v0.2/candidate-manifest.json',
     'evals/debugging/TASK-001.md',
     'evals/debugging/fixtures/task-001/parser.js',
     'evals/debugging/fixtures/task-001/parser.test.js',
@@ -212,7 +213,7 @@ try {
     throw 'Phase 0 v0.2 synthetic tests failed.'
   }
 
-  & .\scripts\test-phase6.ps1
+  & .\scripts\test-phase6.ps1 -RequireFinalCandidate
   if (-not $?) {
     throw 'Phase 6 provenance and binding tests failed.'
   }
