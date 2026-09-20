@@ -2096,6 +2096,11 @@ try {
       throw 'Identical v0.2 context-plan inputs did not produce identical sidecar bytes.'
     }
 
+    $currentPwsh = (Get-Process -Id $PID).Path
+    if ([string]::IsNullOrWhiteSpace($currentPwsh)) {
+      throw 'Unable to resolve the current PowerShell executable path.'
+    }
+
     $providerHostScript = Join-Path $phase4TempRoot 'provider-host.ps1'
     $providerHostText = @'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -2138,7 +2143,7 @@ Write-Output 'completed-host-output'
       -CandidateManifestPath $phase4CandidatePath `
       -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
       -OutputRoot $phase4OutputRelative `
-      -Command 'pwsh.exe' `
+      -Command $currentPwsh `
       -ArgumentList @('-NoProfile', '-File', $providerHostScript))
     $completedRan = @($completedOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
     if ($completedRan.Count -ne 1) {
@@ -2203,7 +2208,7 @@ exit 17
       -CandidateManifestPath $phase4CandidatePath `
       -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
       -OutputRoot $phase4OutputRelative `
-      -Command 'pwsh.exe' `
+      -Command $currentPwsh `
       -ArgumentList @('-NoProfile', '-File', $abortedHostScript))
     $abortedRan = @($abortedOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
     if ($abortedRan.Count -ne 1) {
@@ -2234,7 +2239,7 @@ exit 17
       -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
       -OutputRoot $phase4OutputRelative `
       -RecoveryOf $abortedMetadata.run_id `
-      -Command 'pwsh.exe' `
+      -Command $currentPwsh `
       -ArgumentList @('-NoProfile', '-File', $providerHostScript))
     $recoveryRan = @($recoveryOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
     if ($recoveryRan.Count -ne 1) {
