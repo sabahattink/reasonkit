@@ -643,11 +643,13 @@ try {
     throw 'TASK-004 material exists.'
   }
 
+  $finalCandidatePath = [IO.Path]::GetFullPath((Join-Path $script:PhaseRoot 'dist/v0.2/candidate-manifest.json'))
   $candidateMatches = @(
     Get-ChildItem -LiteralPath $script:PhaseRoot -Recurse -Force -File -ErrorAction SilentlyContinue |
       Where-Object {
         $_.FullName -notmatch '[\\\/]\.git([\\\/]|$)' -and
         $_.FullName -notmatch '[\\\/]evals[\\\/]runs([\\\/]|$)' -and
+        [IO.Path]::GetFullPath($_.FullName) -ine $finalCandidatePath -and
         $_.Name -match '^(candidate|candidate-manifest)([-_].*)?\.(json|yaml|yml)$' -and
         $_.Name -ne 'candidate-manifest.schema.json'
       }
@@ -929,7 +931,7 @@ try {
   }
   $unexpectedV02Artifacts = @(
     Get-ChildItem -LiteralPath (Join-Path $script:PhaseRoot 'dist/v0.2') -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -ne 'reasonkit-kernel.md' }
+      Where-Object { $_.Name -notin @('reasonkit-kernel.md', 'candidate-manifest.json') }
   )
   if ($unexpectedV02Artifacts.Count -gt 0) {
     throw 'Unexpected v0.2 bundle artifact exists.'
