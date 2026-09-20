@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [switch]$Check,
-  [switch]$V02Kernel
+  [switch]$V02Kernel,
+  [switch]$V02Registry
 )
 
 $ErrorActionPreference = 'Stop'
@@ -140,8 +141,53 @@ function Invoke-V02KernelBuild {
   Write-Output 'tokenizer_measurement=build_estimate'
 }
 
+function Invoke-V02RegistryBuild {
+  $sourcePath = Join-Path $root 'core/module-registry.json'
+  if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+    throw 'Missing module registry source: core/module-registry.json'
+  }
+
+  $sourceText = Normalize-ReasonKitText ([IO.File]::ReadAllText($sourcePath))
+  $sourceBytes = $utf8NoBom.GetBytes($sourceText)
+  if ($sourceBytes.Length -gt 2000) {
+    throw ('Module registry exceeds the UTF-8 byte budget: ' + $sourceBytes.Length)
+  }
+
+  $registry = $sourceText | ConvertFrom-Json -Depth 30
+  foreach ($field in @('schema_version', 'registry_id', 'modules', 'routes')) {
+    if ($null -eq $registry.PSObject.Properties[$field]) {
+      throw ('Module registry field is missing: ' + $field)
+    }
+  }
+  if (@($registry.modules).Count -eq 0 -or @($registry.routes).Count -eq 0) {
+    throw 'Module registry must contain modules and routes.'
+  }
+
+  $python = Get-PythonExecutable
+  $tokenizerVersion = Get-TokenizerVersion -Python $python
+  if ($tokenizerVersion -ne '0.14.0') {
+    throw ('Tokenizer version mismatch. Expected 0.14.0, got ' + $tokenizerVersion)
+  }
+  $tokenEstimate = Get-TokenizerEstimate -Text $sourceText -Python $python
+  if ($tokenEstimate -gt 500) {
+    throw ('Module registry exceeds the build-estimate token budget: ' + $tokenEstimate)
+  }
+
+  Write-Output 'v0.2 module registry check passed'
+  Write-Output ('registry_sha256=' + (Get-ByteSha256 -Bytes $sourceBytes))
+  Write-Output ('registry_utf8_bytes=' + $sourceBytes.Length)
+  Write-Output ('registry_build_estimate_tokens=' + $tokenEstimate)
+  Write-Output 'tokenizer=tiktoken/0.14.0/cl100k_base'
+  Write-Output 'tokenizer_measurement=build_estimate'
+}
+
 if ($V02Kernel) {
   Invoke-V02KernelBuild
+  return
+}
+
+if ($V02Registry) {
+  Invoke-V02RegistryBuild
   return
 }
 

@@ -17,6 +17,9 @@ $script:KernelSourcePath = 'core/tiny-kernel.md'
 $script:KernelArtifactPath = 'dist/v0.2/reasonkit-kernel.md'
 $script:KernelSourceBytesMax = 8000
 $script:KernelTokensMax = 2000
+$script:RegistryPath = 'core/module-registry.json'
+$script:RegistrySourceBytesMax = 2000
+$script:RegistryTokensMax = 500
 $script:Phase1MutableV01Seams = @('scripts/build-dist.ps1')
 
 $script:FrozenV01Hashes = [ordered]@{
@@ -443,6 +446,65 @@ function Assert-Throws {
   }
 }
 
+function Assert-LoaderTelemetrySchema {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$BaseDocument,
+    [Parameter(Mandatory = $true)]
+    [object]$Plan,
+    [Parameter(Mandatory = $true)]
+    [string]$SchemaPath,
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  $document = ($BaseDocument | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+  $document.context = $Plan.telemetry
+  $document.provider_measurements = $Plan.provider_measurements
+  $json = $document | ConvertTo-Json -Depth 80 -Compress
+  try {
+    $valid = Test-Json -Json $json -SchemaFile $SchemaPath -ErrorAction Stop
+  }
+  catch {
+    throw ('Actual loader telemetry schema validation failed: ' + $Name + ': ' + $_.Exception.Message)
+  }
+  if ($valid -ne $true) {
+    throw ('Actual loader telemetry schema validation returned false: ' + $Name)
+  }
+
+  $allowedModuleFields = @(
+    'module_id', 'module_sha256', 'module_bytes', 'module_tokens',
+    'load_reason', 'load_phase', 'module_reuse', 'load_action',
+    'previous_sha256', 'reload_reason', 'context_injected'
+  )
+  $allowedReuseFields = @('reused', 'count', 'scope', 'reason')
+  $allowedPhases = @('classification', 'evidence', 'specialist', 'verification', 'other')
+  foreach ($record in @($Plan.telemetry.modules_loaded)) {
+    $unexpected = @($record.PSObject.Properties.Name | Where-Object { $allowedModuleFields -notcontains $_ })
+    if ($unexpected.Count -gt 0) {
+      throw ('Schema-bound module telemetry leaked internal fields: ' + ($unexpected -join ', '))
+    }
+    foreach ($field in $allowedModuleFields) {
+      if ($null -eq $record.PSObject.Properties[$field]) {
+        throw ('Schema-bound module telemetry field is missing: ' + $Name + '/' + $field)
+      }
+    }
+    if ($allowedPhases -notcontains $record.load_phase) {
+      throw ('Schema-bound module telemetry emitted an invalid load_phase: ' + $record.load_phase)
+    }
+    $reuseUnexpected = @($record.module_reuse.PSObject.Properties.Name | Where-Object { $allowedReuseFields -notcontains $_ })
+    if ($reuseUnexpected.Count -gt 0) {
+      throw ('Schema-bound module_reuse leaked internal fields: ' + ($reuseUnexpected -join ', '))
+    }
+    foreach ($field in $allowedReuseFields) {
+      if ($null -eq $record.module_reuse.PSObject.Properties[$field]) {
+        throw ('Schema-bound module_reuse field is missing: ' + $Name + '/' + $field)
+      }
+    }
+  }
+  return $document
+}
+
 Push-Location $script:PhaseRoot
 try {
   $resolvedBaseline = Invoke-GitText -Arguments @('rev-parse', ($script:BaselineCommit + '^{commit}'))
@@ -503,6 +565,7 @@ try {
     throw 'A v0.2 candidate instance exists.'
   }
 
+  $telemetrySchemaPath = Join-Path $script:PhaseRoot 'core\telemetry.schema.json'
   $telemetrySchema = Assert-SchemaContract -RelativePath 'core/telemetry.schema.json' -RequiredTopLevelFields @('schema_version', 'identity', 'provenance', 'context', 'specialists', 'outcome', 'provider_measurements', 'integrity')
   $candidateSchema = Assert-SchemaContract -RelativePath 'core/candidate-manifest.schema.json' -RequiredTopLevelFields @('candidate_id', 'candidate_version', 'source_commit', 'candidate_manifest_sha256', 'kernel_sha256', 'module_manifest_sha256', 'covered_files')
 
@@ -781,6 +844,594 @@ try {
     throw 'Unexpected v0.2 bundle artifact exists.'
   }
 
+  $registrySourceAbsolutePath = Join-Path $script:PhaseRoot ($script:RegistryPath -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $registrySourceAbsolutePath -PathType Leaf)) {
+    throw ('Module registry source is missing: ' + $script:RegistryPath)
+  }
+  $registryRawText = [IO.File]::ReadAllText($registrySourceAbsolutePath)
+  $registryText = Normalize-AuthoredText -Text $registryRawText
+  $registryTextAgain = Normalize-AuthoredText -Text $registryText
+  if ($registryText -cne $registryTextAgain) {
+    throw 'Module registry normalization is not deterministic.'
+  }
+  $registryUtf8 = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
+  $registryBytes = $registryUtf8.GetBytes($registryText)
+  $registryBytesAgain = $registryUtf8.GetBytes($registryText)
+  if ([Convert]::ToBase64String($registryBytes) -cne [Convert]::ToBase64String($registryBytesAgain)) {
+    throw 'Module registry byte measurement is not deterministic.'
+  }
+  if ($registryBytes.Length -gt $script:RegistrySourceBytesMax) {
+    throw ('Module registry exceeds the UTF-8 byte budget: ' + $registryBytes.Length)
+  }
+  $registryTokens = Get-TokenizerEstimate -Text $registryText -Python $python
+  $registryTokensAgain = Get-TokenizerEstimate -Text $registryText -Python $python
+  if ($registryTokens -ne $registryTokensAgain) {
+    throw 'Module registry tokenizer estimates are not deterministic.'
+  }
+  if ($registryTokens -gt $script:RegistryTokensMax) {
+    throw ('Module registry exceeds the build-estimate token budget: ' + $registryTokens)
+  }
+  $registryDocument = $registryText | ConvertFrom-Json -Depth 30
+  foreach ($field in @('schema_version', 'registry_id', 'modules', 'routes')) {
+    if (-not (Test-HasProperty -Object $registryDocument -Name $field)) {
+      throw ('Module registry field is missing: ' + $field)
+    }
+  }
+  $registryModuleItems = @(Get-PropertyValue -Object $registryDocument -Name 'modules')
+  if ($registryModuleItems.Count -eq 0) {
+    throw 'Module registry must contain at least one module.'
+  }
+  $registryModuleIds = @($registryModuleItems | ForEach-Object { Get-PropertyValue -Object $_ -Name 'module_id' })
+  if (@($registryModuleIds | Group-Object | Where-Object Count -gt 1).Count -gt 0) {
+    throw 'Module registry contains duplicate module IDs.'
+  }
+  $registryModuleById = @{}
+  foreach ($module in $registryModuleItems) {
+    $moduleId = Get-PropertyValue -Object $module -Name 'module_id'
+    $sourcePath = Get-PropertyValue -Object $module -Name 'source_path'
+    if ([string]::IsNullOrWhiteSpace($moduleId) -or [string]::IsNullOrWhiteSpace($sourcePath)) {
+      throw 'Every registry module needs a module_id and source_path.'
+    }
+    if ((Normalize-RepoPath -Path $sourcePath) -ne $sourcePath) {
+      throw ('Registry module source path is not canonical: ' + $sourcePath)
+    }
+    $registryModuleById[$moduleId] = $sourcePath
+  }
+  $registryRouteItems = @(Get-PropertyValue -Object $registryDocument -Name 'routes')
+  if ($registryRouteItems.Count -eq 0) {
+    throw 'Module registry must contain at least one route.'
+  }
+  $registryRouteIds = @($registryRouteItems | ForEach-Object { Get-PropertyValue -Object $_ -Name 'route_id' })
+  if (@($registryRouteIds | Group-Object | Where-Object Count -gt 1).Count -gt 0) {
+    throw 'Module registry contains duplicate route IDs.'
+  }
+  foreach ($routeItem in $registryRouteItems) {
+    $routeId = Get-PropertyValue -Object $routeItem -Name 'route_id'
+    $routeModules = @(Get-PropertyValue -Object $routeItem -Name 'module_ids')
+    $triggerSummary = Get-PropertyValue -Object $routeItem -Name 'trigger_summary'
+    if ([string]::IsNullOrWhiteSpace($routeId) -or
+        [string]::IsNullOrWhiteSpace($triggerSummary) -or
+        $routeModules.Count -eq 0) {
+      throw 'Every registry route needs a route_id, trigger_summary, and module_ids.'
+    }
+    foreach ($moduleId in $routeModules) {
+      if (-not $registryModuleById.ContainsKey($moduleId)) {
+        throw ('Registry route references an unresolved module: ' + $moduleId)
+      }
+    }
+    foreach ($conditional in @(
+      Get-PropertyValue -Object $routeItem -Name 'conditional_modules' |
+        Where-Object { $null -ne $_ }
+    )) {
+      $conditionalId = Get-PropertyValue -Object $conditional -Name 'module_id'
+      $capability = Get-PropertyValue -Object $conditional -Name 'capability'
+      if (-not $registryModuleById.ContainsKey($conditionalId) -or [string]::IsNullOrWhiteSpace($capability)) {
+        throw ('Registry conditional module is invalid on route: ' + $routeId)
+      }
+    }
+  }
+  foreach ($marker in @('TASK-001', 'TASK-002', 'TASK-003', 'TASK-004', 'Reliable Engineering', 'benchmark')) {
+    if ($registryText.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+      throw ('Forbidden benchmark marker in module registry: ' + $marker)
+    }
+  }
+  $registrySha256 = Get-TextSha256 -Text $registryText
+  if ($registrySha256 -ne (Get-TextSha256 -Text $registryText)) {
+    throw 'Module registry SHA-256 is not deterministic.'
+  }
+  $registryBuildOutput = @(
+    & .\scripts\build-dist.ps1 -V02Registry -Check 2>&1 |
+      ForEach-Object { $_.ToString() }
+  )
+  if (-not $?) {
+    throw 'Module registry build/check failed.'
+  }
+  foreach ($expectedRegistryOutput in @(
+    'v0.2 module registry check passed',
+    ('registry_sha256=' + $registrySha256),
+    ('registry_utf8_bytes=' + $registryBytes.Length),
+    ('registry_build_estimate_tokens=' + $registryTokens)
+  )) {
+    if ($registryBuildOutput -notcontains $expectedRegistryOutput) {
+      throw ('Module registry build/check output is missing: ' + $expectedRegistryOutput)
+    }
+  }
+
+  $loaderModulePath = Join-Path $script:PhaseRoot 'scripts/reasonkit-v02.psm1'
+  if (-not (Test-Path -LiteralPath $loaderModulePath -PathType Leaf)) {
+    throw 'RK2-02 loader module is missing.'
+  }
+  Import-Module -Name $loaderModulePath -Force
+  $loaderRegistry = Read-ReasonKitModuleRegistry -Path $registrySourceAbsolutePath
+  $loaderManifestModules = @(
+    foreach ($module in @($loaderRegistry.modules)) {
+      $moduleId = Get-PropertyValue -Object $module -Name 'module_id'
+      $sourcePath = Get-PropertyValue -Object $module -Name 'source_path'
+      [PSCustomObject]@{
+        module_id = $moduleId
+        source_path = $sourcePath
+        sha256 = Get-FileSha256 -RelativePath $sourcePath
+      }
+    }
+  )
+  $loaderManifest = [PSCustomObject]@{
+    manifest_id = 'synthetic-phase-2'
+    modules = $loaderManifestModules
+  }
+  $loaderEvidence = [PSCustomObject]@{
+    evidence_id = 'synthetic-local-evidence'
+    load_reason = 'route selected from supplied evidence'
+  }
+  $requiredLoadRecordFields = @(
+    'module_id', 'module_sha256', 'source_path', 'module_bytes',
+    'module_tokens_build_estimate', 'load_reason', 'load_phase',
+    'parent_route', 'load_action', 'previous_sha256', 'reload_reason',
+    'context_injected', 'module_reuse', 'order'
+  )
+  $firstRunState = New-ReasonKitRunState
+  $firstPlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Phase 'route' `
+    -RequiredCapabilities @() `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RegistryPath $registrySourceAbsolutePath `
+    -RunState $firstRunState
+  $firstRecord = @($firstPlan.selected_modules)[0]
+  if ($firstPlan.full_bundle_loaded -ne $false -or
+      $firstPlan.kernel.loaded -ne $true -or
+      $firstRecord.load_action -ne 'loaded' -or
+      $firstRecord.context_injected -ne $true -or
+      $firstRecord.module_reuse.reused -ne $false) {
+    throw 'First module load did not produce the required loaded record.'
+  }
+  foreach ($field in $requiredLoadRecordFields) {
+    if ($null -eq $firstRecord.PSObject.Properties[$field]) {
+      throw ('Load record field is missing: ' + $field)
+    }
+  }
+  if (@($firstRunState.injected_context).Count -ne 1) {
+    throw 'First module load did not inject exactly once.'
+  }
+  $projectedRegistryTokens = Get-PropertyValue -Object $firstPlan.telemetry -Name 'loader_index_tokens'
+  if ($firstPlan.telemetry.loader_index_bytes -ne $registryBytes.Length -or
+      $projectedRegistryTokens -ne $registryTokens -or
+      $firstPlan.telemetry.loader_request_count -ne 1) {
+    throw 'Loader cost telemetry is incomplete or incorrect.'
+  }
+  foreach ($providerField in @('input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_tokens', 'total_tokens')) {
+    if ($null -ne $firstPlan.provider_measurements.$providerField) {
+      throw ('Provider measurement must remain null: ' + $providerField)
+    }
+  }
+  if ($null -eq $firstRecord.module_tokens_build_estimate -or
+      $null -ne $firstRecord.PSObject.Properties['input_tokens']) {
+    throw 'Build-estimate tokens were not kept separate from provider measurements.'
+  }
+  foreach ($omittedField in @('source_manifest_sha256', 'module_ids', 'bytes', 'tokens', 'derivation', 'status')) {
+    if ($null -eq $firstPlan.telemetry.omitted_context.PSObject.Properties[$omittedField]) {
+      throw ('Omitted-context field is missing: ' + $omittedField)
+    }
+  }
+  if ($firstPlan.telemetry.omitted_context.status -ne 'unavailable' -or
+      $null -ne $firstPlan.telemetry.omitted_context.bytes -or
+      $null -ne $firstPlan.telemetry.omitted_context.tokens) {
+    throw 'Omitted-context telemetry is not explicitly unavailable.'
+  }
+
+  $secondPlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Phase 'route' `
+    -RequiredCapabilities @() `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RegistryPath $registrySourceAbsolutePath `
+    -RunState $firstRunState
+  $secondRecord = @($secondPlan.selected_modules)[0]
+  if ($secondRecord.load_action -ne 'reused' -or
+      $secondRecord.context_injected -ne $false -or
+      $secondRecord.module_reuse.reused -ne $true -or
+      $secondRecord.module_reuse.scope -ne 'same_run' -or
+      @($firstRunState.injected_context).Count -ne 1 -or
+      $secondPlan.telemetry.loader_request_count -ne 2) {
+    throw 'Same module and hash did not deduplicate deterministically.'
+  }
+
+  if ($secondPlan.telemetry.modules_loaded[0].load_action -ne 'reused' -or
+      $secondPlan.telemetry.modules_loaded[0].context_injected -ne $false -or
+      $secondPlan.telemetry.modules_loaded[0].module_reuse.reused -ne $true) {
+    throw 'Schema-bound reused telemetry did not preserve no-injection semantics.'
+  }
+
+  $cacheRunState = New-ReasonKitRunState
+  $cacheEvidence = [PSCustomObject]@{
+    evidence_id = 'synthetic-provider-cache-event'
+    load_reason = 'provider cache event observed'
+    provider_cache = 'hit'
+  }
+  $cachePlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $cacheEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RegistryPath $registrySourceAbsolutePath `
+    -RunState $cacheRunState
+  if ($cachePlan.selected_modules[0].module_reuse.reused -ne $false) {
+    throw 'Provider cache was incorrectly reported as ReasonKit module reuse.'
+  }
+
+  $codingManifestEntry = @($loaderManifestModules | Where-Object { $_.module_id -eq 'protocol.coding' })[0]
+  $debuggingManifestEntry = @($loaderManifestModules | Where-Object { $_.module_id -eq 'protocol.debugging' })[0]
+  $revisionRegistry = [PSCustomObject]@{
+    schema_version = '0.2'
+    registry_id = 'synthetic-revision'
+    modules = @([PSCustomObject]@{
+      module_id = 'protocol.coding'
+      source_path = $debuggingManifestEntry.source_path
+    })
+    routes = @([PSCustomObject]@{
+      route_id = 'coding'
+      module_ids = @('protocol.coding')
+      trigger_summary = 'synthetic revision'
+    })
+  }
+  $revisionManifest = [PSCustomObject]@{
+    manifest_id = 'synthetic-revision-manifest'
+    modules = @([PSCustomObject]@{
+      module_id = 'protocol.coding'
+      source_path = $debuggingManifestEntry.source_path
+      sha256 = $debuggingManifestEntry.sha256
+    })
+  }
+  $reloadRunState = New-ReasonKitRunState
+  $null = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RegistryPath $registrySourceAbsolutePath `
+    -RunState $reloadRunState
+  $reloadEvidence = [PSCustomObject]@{
+    evidence_id = 'synthetic-explicit-revision'
+    load_reason = 'explicit source revision evidence'
+    reload_reason = 'explicit revision context'
+  }
+  $reloadPlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $reloadEvidence `
+    -Phase 'route' `
+    -Registry $revisionRegistry `
+    -Manifest $revisionManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $reloadRunState
+  $reloadRecord = @($reloadPlan.selected_modules)[0]
+  if ($reloadRecord.load_action -ne 'reloaded' -or
+      $reloadRecord.context_injected -ne $true -or
+      $reloadRecord.previous_sha256 -ne $codingManifestEntry.sha256 -or
+      $reloadRecord.module_sha256 -ne $debuggingManifestEntry.sha256 -or
+      $reloadRecord.reload_reason -ne 'explicit revision context') {
+    throw 'Explicit different-hash revision did not produce a reloaded record.'
+  }
+
+  $null = Assert-LoaderTelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Plan $firstPlan -SchemaPath $telemetrySchemaPath -Name 'loaded'
+  $null = Assert-LoaderTelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Plan $secondPlan -SchemaPath $telemetrySchemaPath -Name 'reused'
+  $null = Assert-LoaderTelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Plan $reloadPlan -SchemaPath $telemetrySchemaPath -Name 'reloaded'
+
+  $invalidPhasePlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Phase 'not-a-schema-phase' `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState (New-ReasonKitRunState)
+  if (@($invalidPhasePlan.telemetry.modules_loaded)[0].load_phase -ne 'other') {
+    throw 'Invalid internal phase was emitted outside the frozen schema enum.'
+  }
+  $null = Assert-LoaderTelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Plan $invalidPhasePlan -SchemaPath $telemetrySchemaPath -Name 'invalid-phase-projection'
+  $unexplainedRunState = New-ReasonKitRunState
+  $null = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $unexplainedRunState
+  Assert-Throws -Name 'unexplained different-hash duplicate' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'coding' `
+      -Evidence $loaderEvidence `
+      -Registry $revisionRegistry `
+      -Manifest $revisionManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState $unexplainedRunState
+  }
+  if (@($unexplainedRunState.injected_context).Count -ne 1) {
+    throw 'Unexplained duplicate changed injected context.'
+  }
+
+  $boundaryRunState = New-ReasonKitRunState
+  $null = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $boundaryRunState
+  Assert-Throws -Name 'phase-boundary reload without reason' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'coding' `
+      -Evidence ([PSCustomObject]@{ load_reason = 'boundary'; phase_boundary_reload = $true }) `
+      -Phase 'verification' `
+      -Registry $loaderRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState $boundaryRunState
+  }
+  $boundaryPlan = Resolve-ReasonKitContext `
+    -Route 'coding' `
+    -Evidence ([PSCustomObject]@{ load_reason = 'boundary'; phase_boundary_reload = $true; reload_reason = 'explicit phase boundary' }) `
+    -Phase 'verification' `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $boundaryRunState
+  if ($boundaryPlan.selected_modules[0].load_action -ne 'reloaded' -or
+      $boundaryPlan.selected_modules[0].context_injected -ne $true -or
+      $boundaryPlan.selected_modules[0].reload_reason -ne 'explicit phase boundary') {
+    throw 'Explicit same-hash phase-boundary reload was not recorded.'
+  }
+
+  $duplicateRegistry = [PSCustomObject]@{
+    schema_version = '0.2'
+    registry_id = 'synthetic-duplicate'
+    modules = @(
+      [PSCustomObject]@{ module_id = 'protocol.coding'; source_path = 'protocols/coding.md' },
+      [PSCustomObject]@{ module_id = 'protocol.coding'; source_path = 'protocols/debugging.md' }
+    )
+    routes = @([PSCustomObject]@{ route_id = 'coding'; module_ids = @('protocol.coding'); trigger_summary = 'duplicate' })
+  }
+  Assert-Throws -Name 'duplicate registry module IDs' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'coding' `
+      -Evidence $loaderEvidence `
+      -Registry $duplicateRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+  }
+  $duplicateConditionalRegistry = [PSCustomObject]@{
+    schema_version = '0.2'
+    registry_id = 'synthetic-duplicate-conditional'
+    modules = @(
+      [PSCustomObject]@{ module_id = 'protocol.design'; source_path = 'protocols/design.md' },
+      [PSCustomObject]@{ module_id = 'taste.anti-generic'; source_path = 'taste/anti-generic.md' }
+    )
+    routes = @([PSCustomObject]@{
+      route_id = 'design'
+      module_ids = @('protocol.design')
+      conditional_modules = @(
+        [PSCustomObject]@{ module_id = 'taste.anti-generic'; capability = 'taste' },
+        [PSCustomObject]@{ module_id = 'taste.anti-generic'; capability = 'taste' }
+      )
+      trigger_summary = 'duplicate conditional'
+    })
+  }
+  Assert-Throws -Name 'duplicate conditional registry modules' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'design' `
+      -Evidence $loaderEvidence `
+      -Registry $duplicateConditionalRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+  }
+  $unresolvedRegistry = [PSCustomObject]@{
+    schema_version = '0.2'
+    registry_id = 'synthetic-unresolved'
+    modules = @([PSCustomObject]@{ module_id = 'protocol.coding'; source_path = 'protocols/coding.md' })
+    routes = @([PSCustomObject]@{ route_id = 'coding'; module_ids = @('protocol.missing'); trigger_summary = 'unresolved' })
+  }
+  Assert-Throws -Name 'unresolved registry reference' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'coding' `
+      -Evidence $loaderEvidence `
+      -Registry $unresolvedRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+  }
+  $missingSourceRegistry = [PSCustomObject]@{
+    schema_version = '0.2'
+    registry_id = 'synthetic-missing-source'
+    modules = @([PSCustomObject]@{ module_id = 'protocol.missing'; source_path = 'core/does-not-exist.md' })
+    routes = @([PSCustomObject]@{ route_id = 'missing'; module_ids = @('protocol.missing'); trigger_summary = 'missing source' })
+  }
+  $missingSourceManifest = [PSCustomObject]@{
+    manifest_id = 'synthetic-missing-source-manifest'
+    modules = @([PSCustomObject]@{ module_id = 'protocol.missing'; source_path = 'core/does-not-exist.md'; sha256 = ('0' * 64) })
+  }
+  Assert-Throws -Name 'missing source file' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'missing' `
+      -Evidence $loaderEvidence `
+      -Registry $missingSourceRegistry `
+      -Manifest $missingSourceManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+  }
+  $badHashManifest = [PSCustomObject]@{
+    manifest_id = 'synthetic-bad-hash'
+    modules = @(
+      foreach ($entry in $loaderManifestModules) {
+        [PSCustomObject]@{
+          module_id = $entry.module_id
+          source_path = $entry.source_path
+          sha256 = if ($entry.module_id -eq 'protocol.coding') { ('0' * 64) } else { $entry.sha256 }
+        }
+      }
+    )
+  }
+  Assert-Throws -Name 'source hash mismatch' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'coding' `
+      -Evidence $loaderEvidence `
+      -Registry $loaderRegistry `
+      -Manifest $badHashManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+  }
+
+  $missingKernelRoot = Join-Path ([IO.Path]::GetTempPath()) ('reasonkit-v02-missing-kernel-' + [Guid]::NewGuid().ToString('N'))
+  $missingKernelState = New-ReasonKitRunState
+  $missingKernelError = $null
+  $missingKernelPlan = $null
+  New-Item -ItemType Directory -Path $missingKernelRoot -Force | Out-Null
+  try {
+    try {
+      $missingKernelPlan = Resolve-ReasonKitContext `
+        -Route 'coding' `
+        -Evidence $loaderEvidence `
+        -Registry $loaderRegistry `
+        -Manifest $loaderManifest `
+        -RepositoryRoot $missingKernelRoot `
+        -RunState $missingKernelState
+    }
+    catch {
+      $missingKernelError = $_.Exception.Message
+    }
+  }
+  finally {
+    Remove-Item -LiteralPath $missingKernelRoot -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if ($null -ne $missingKernelPlan -or
+      [string]::IsNullOrWhiteSpace($missingKernelError) -or
+      $missingKernelError -notmatch '(?i)kernel' -or
+      @($missingKernelState.injected_context).Count -ne 0 -or
+      @($missingKernelState.load_records).Count -ne 0) {
+    throw 'Missing kernel did not fail closed before module injection.'
+  }
+  $failedState = New-ReasonKitRunState
+  Assert-Throws -Name 'unknown route fail closed' -Script {
+    Resolve-ReasonKitContext `
+      -Route 'not-registered' `
+      -Evidence $loaderEvidence `
+      -Registry $loaderRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState $failedState
+  }
+  if (@($failedState.injected_context).Count -ne 0) {
+    throw 'Normal loader error injected a fallback context.'
+  }
+
+  foreach ($routeId in @('coding', 'debugging', 'architecture', 'research')) {
+    $localityPlan = Resolve-ReasonKitContext `
+      -Route $routeId `
+      -Evidence $loaderEvidence `
+      -Registry $loaderRegistry `
+      -Manifest $loaderManifest `
+      -RepositoryRoot $script:PhaseRoot `
+      -RunState (New-ReasonKitRunState)
+    foreach ($record in @($localityPlan.selected_modules)) {
+      if ($record.module_id -like 'taste.*' -or $record.module_id -eq 'protocol.design') {
+        throw ('Engineering route loaded design/taste content: ' + $routeId)
+      }
+    }
+  }
+  $designPlan = Resolve-ReasonKitContext `
+    -Route 'design' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RequiredCapabilities @() `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState (New-ReasonKitRunState)
+  if (@($designPlan.selected_modules).Count -ne 1) {
+    throw 'Design route loaded conditional taste content without an explicit capability.'
+  }
+  $designTastePlan = Resolve-ReasonKitContext `
+    -Route 'design' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RequiredCapabilities @('taste') `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState (New-ReasonKitRunState)
+  if (@($designTastePlan.selected_modules | Where-Object { $_.module_id -eq 'taste.anti-generic' }).Count -ne 1) {
+    throw 'Explicit design taste capability did not load the conditional module.'
+  }
+  $computerPlan = Resolve-ReasonKitContext `
+    -Route 'computer-use' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RequiredCapabilities @() `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState (New-ReasonKitRunState)
+  if (@($computerPlan.selected_modules | Where-Object { $_.module_id -eq 'core.computer-use-policy' }).Count -ne 0) {
+    throw 'Computer-use policy loaded without an explicit capability.'
+  }
+  $computerPolicyPlan = Resolve-ReasonKitContext `
+    -Route 'computer-use' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RequiredCapabilities @('computer-use-policy') `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState (New-ReasonKitRunState)
+  if (@($computerPolicyPlan.selected_modules | Where-Object { $_.module_id -eq 'core.computer-use-policy' }).Count -ne 1) {
+    throw 'Explicit computer-use policy capability did not load the conditional module.'
+  }
+
+  $planStateA = New-ReasonKitRunState
+  $planStateB = New-ReasonKitRunState
+  $planA = Resolve-ReasonKitContext `
+    -Route 'architecture' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $planStateA
+  $planB = Resolve-ReasonKitContext `
+    -Route 'architecture' `
+    -Evidence $loaderEvidence `
+    -Registry $loaderRegistry `
+    -Manifest $loaderManifest `
+    -RepositoryRoot $script:PhaseRoot `
+    -RunState $planStateB
+  $signatureA = @($planA.selected_modules | ForEach-Object { $_.module_id + '|' + $_.module_sha256 + '|' + $_.load_action + '|' + $_.context_injected }) -join ';'
+  $signatureB = @($planB.selected_modules | ForEach-Object { $_.module_id + '|' + $_.module_sha256 + '|' + $_.load_action + '|' + $_.context_injected }) -join ';'
+  if ($signatureA -cne $signatureB -or $planA.full_bundle_loaded -ne $planB.full_bundle_loaded) {
+    throw 'Identical loader input did not produce an identical context plan.'
+  }
+
   Write-Output 'Phase 0 v0.2 synthetic tests passed'
   Write-Output ('baseline_commit=' + $script:BaselineCommit)
   Write-Output ('frozen_design_sha256=' + $mirrorHash)
@@ -792,6 +1443,10 @@ try {
   Write-Output ('kernel_utf8_bytes=' + $kernelBytes.Length)
   Write-Output ('kernel_build_estimate_tokens=' + $kernelTokens)
   Write-Output ('generated_kernel_sha256=' + $generatedKernelSha256)
+  Write-Output ('registry_sha256=' + $registrySha256)
+  Write-Output ('registry_utf8_bytes=' + $registryBytes.Length)
+  Write-Output ('registry_build_estimate_tokens=' + $registryTokens)
+  Write-Output 'rk2_02_loader_tests=PASS'
 }
 finally {
   Pop-Location

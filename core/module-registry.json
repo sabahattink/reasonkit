@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.2",
+  "registry_id": "reasonkit-v0.2-routes",
+  "modules": [
+    {"module_id": "protocol.coding", "source_path": "protocols/coding.md"},
+    {"module_id": "protocol.debugging", "source_path": "protocols/debugging.md"},
+    {"module_id": "protocol.architecture", "source_path": "protocols/architecture.md"},
+    {"module_id": "protocol.research", "source_path": "protocols/research.md"},
+    {"module_id": "protocol.design", "source_path": "protocols/design.md"},
+    {"module_id": "taste.anti-generic", "source_path": "taste/anti-generic.md"},
+    {"module_id": "protocol.computer-use", "source_path": "protocols/computer-use.md"},
+    {"module_id": "core.computer-use-policy", "source_path": "core/computer-use-policy.md"}
+  ],
+  "routes": [
+    {"route_id": "coding", "module_ids": ["protocol.coding"], "trigger_summary": "software implementation or code change"},
+    {"route_id": "debugging", "module_ids": ["protocol.debugging"], "trigger_summary": "fault diagnosis or repair"},
+    {"route_id": "architecture", "module_ids": ["protocol.architecture"], "trigger_summary": "system structure or tradeoff"},
+    {"route_id": "research", "module_ids": ["protocol.research"], "trigger_summary": "evidence-based investigation"},
+    {"route_id": "design", "module_ids": ["protocol.design"], "conditional_modules": [{"module_id": "taste.anti-generic", "capability": "taste"}], "trigger_summary": "visual or interaction design"},
+    {"route_id": "computer-use", "module_ids": ["protocol.computer-use"], "conditional_modules": [{"module_id": "core.computer-use-policy", "capability": "computer-use-policy"}], "trigger_summary": "computer interaction"}
+  ]
+}
