@@ -194,8 +194,11 @@ function Assert-CandidateSourceCommitBinding {
       ForEach-Object { $_.ToString().Trim() }
   )
   $global:LASTEXITCODE = 0
-  $expectedChange = 'A' + [string][char]9 + 'dist/v0.2/candidate-manifest.json'
-  if ($changes.Count -ne 1 -or $changes[0] -cne $expectedChange) {
+  $expectedChanges = @(
+    'A' + [string][char]9 + 'dist/v0.2/candidate-manifest.json',
+    'M' + [string][char]9 + 'dist/v0.2/candidate-manifest.json'
+  )
+  if ($changes.Count -ne 1 -or $expectedChanges -notcontains $changes[0]) {
     throw 'Candidate source_commit differs from checkout without a manifest-only freeze commit.'
   }
 }
