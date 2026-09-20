@@ -8,6 +8,9 @@ $script:TokenizerMeasurement = 'build_estimate'
 $script:Utf8NoBom = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
 $script:Utf8Strict = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList @($false, $true)
 $script:ExpectedKernelSha256 = 'b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a'
+$script:SpecialistMax = 3
+$script:AdversarialMax = 1
+$script:SpecialistReportTokenMax = 512
 
 function Get-RkProperty {
   param(
@@ -323,6 +326,12 @@ function New-ReasonKitRunState {
     injected_context = [System.Collections.Generic.List[string]]::new()
     next_order = 1
     request_count = 0
+    specialists_authorized = [System.Collections.Generic.List[object]]::new()
+    specialists_started = [System.Collections.Generic.List[object]]::new()
+    roles_started = [System.Collections.Generic.List[string]]::new()
+    adversarial_authorizations = 0
+    adversarial_passes = 0
+    prior_decisions = [System.Collections.Generic.List[object]]::new()
   }
 }
 
@@ -332,7 +341,12 @@ function Assert-RkRunState {
   if ($null -eq $RunState) {
     throw 'Per-run state is required.'
   }
-  foreach ($field in @('loaded_by_key', 'loaded_by_module', 'load_records', 'injected_context', 'next_order', 'request_count')) {
+  foreach ($field in @(
+    'loaded_by_key', 'loaded_by_module', 'load_records', 'injected_context',
+    'next_order', 'request_count', 'specialists_authorized',
+    'specialists_started', 'roles_started', 'adversarial_authorizations',
+    'adversarial_passes', 'prior_decisions'
+  )) {
     if ($null -eq $RunState.PSObject.Properties[$field]) {
       throw ('Per-run state field is missing: ' + $field)
     }
@@ -593,6 +607,617 @@ function Convert-RkTelemetryProjection {
   }
 }
 
+function Get-RkSpecialistStrings {
+  param([object]$Value)
+
+  return @(
+    foreach ($item in @($Value)) {
+      if ($null -eq $item) {
+        continue
+      }
+      $text = ([string]$item).Trim()
+      if (-not [string]::IsNullOrWhiteSpace($text)) {
+        $text
+      }
+    }
+  )
+}
+
+function Get-RkSpecialistSignals {
+  param(
+    [object]$Request,
+    [int]$HypothesisCount,
+    [string]$EvidenceState,
+    [string]$VerificationState,
+    [string]$Risk
+  )
+
+  $aliases = @{
+    'competing_hypotheses' = 'competing_hypotheses'
+    'two_or_more_live_competing_hypotheses' = 'competing_hypotheses'
+    'conflicting_evidence' = 'conflicting_evidence'
+    'ownership_ambiguity' = 'ownership_ambiguity'
+    'unfamiliar_external_domain' = 'unfamiliar_external_domain'
+    'high_impact_irreversible' = 'high_impact_irreversible'
+    'nondeterministic_verification' = 'nondeterministic_verification'
+    'unresolved_creative_direction' = 'unresolved_creative_direction'
+    'creative_direction_unresolved' = 'unresolved_creative_direction'
+  }
+  $ignored = @('uncertainty', 'l3', 'l4', 'complexity', 'more_reasoning', 'general_task_difficulty')
+  $signals = [System.Collections.Generic.List[string]]::new()
+  foreach ($rawSignal in @(Get-RkSpecialistStrings -Value (Get-RkProperty -Object $Request -Name 'consideration_signals'))) {
+    $key = $rawSignal.ToLowerInvariant().Replace(' ', '_').Replace('-', '_')
+    if ($ignored -contains $key) {
+      continue
+    }
+    if ($aliases.ContainsKey($key)) {
+      $signals.Add($aliases[$key])
+    }
+  }
+  if ($HypothesisCount -ge 2) {
+    $signals.Add('competing_hypotheses')
+  }
+  if ($EvidenceState -eq 'conflicting_unresolved') {
+    $signals.Add('conflicting_evidence')
+  }
+  if ($VerificationState -eq 'nondeterministic') {
+    $signals.Add('nondeterministic_verification')
+  }
+  if ($Risk -in @('high', 'material', 'irreversible')) {
+    $signals.Add('high_impact_irreversible')
+  }
+  return @($signals | Sort-Object -Unique)
+}
+
+function Test-RkSpecialistEvidenceResolved {
+  param(
+    [object]$Request,
+    [string]$EvidenceState
+  )
+
+  if ([bool](Get-RkProperty -Object $Request -Name 'evidence_resolved')) {
+    return $true
+  }
+  return $EvidenceState -in @(
+    'resolved',
+    'resolved_by_test',
+    'resolved_by_local_verification',
+    'resolved_by_authoritative_query',
+    'collapsed_by_evidence'
+  )
+}
+
+function Get-RkSpecialistBudget {
+  param(
+    [object]$Request,
+    [int]$AuthorizedCount,
+    [int]$AdversarialPasses,
+    [int]$AdversarialAuthorizations
+  )
+
+  $requestedBudget = Get-RkProperty -Object $Request -Name 'remaining_budget'
+  $requestedSpecialists = Get-RkProperty -Object $requestedBudget -Name 'specialists_remaining'
+  $requestedAdversarial = Get-RkProperty -Object $requestedBudget -Name 'adversarial_passes_remaining'
+  $specialistsRemaining = if ($null -eq $requestedSpecialists) {
+    [Math]::Max(0, $script:SpecialistMax - $AuthorizedCount)
+  }
+  else {
+    [Math]::Max(0, [int]$requestedSpecialists)
+  }
+  $adversarialRemaining = if ($null -eq $requestedAdversarial) {
+    [Math]::Max(0, $script:AdversarialMax - $AdversarialAuthorizations)
+  }
+  else {
+    [Math]::Max(0, [int]$requestedAdversarial)
+  }
+  return [pscustomobject][ordered]@{
+    specialists_remaining = $specialistsRemaining
+    adversarial_authorizations_remaining = $adversarialRemaining
+  }
+}
+
+function Test-ReasonKitSpecialistReport {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Report,
+    [Parameter(Mandatory = $false)]
+    [string]$Python
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Python)) {
+    $Python = Get-RkPythonExecutable
+  }
+  $requiredFields = @('role', 'evidence_refs', 'conclusion', 'residual_risk', 'recommended_next_action')
+  if ($null -eq $Report) {
+    return [pscustomobject][ordered]@{
+      accepted = $false
+      over_budget = $false
+      report_tokens = $null
+      report = $null
+      telemetry_record = $null
+      rejection_reason = 'specialist report is null'
+    }
+  }
+  $properties = @($Report.PSObject.Properties.Name)
+  $missing = @($requiredFields | Where-Object { $properties -notcontains $_ })
+  $extra = @($properties | Where-Object { $requiredFields -notcontains $_ })
+  if ($missing.Count -gt 0 -or $extra.Count -gt 0) {
+    $reasonParts = [System.Collections.Generic.List[string]]::new()
+    if ($missing.Count -gt 0) {
+      $reasonParts.Add('missing=' + ($missing -join ','))
+    }
+    if ($extra.Count -gt 0) {
+      $reasonParts.Add('extra=' + ($extra -join ','))
+    }
+    return [pscustomobject][ordered]@{
+      accepted = $false
+      over_budget = $false
+      report_tokens = $null
+      report = $null
+      telemetry_record = $null
+      rejection_reason = ($reasonParts -join '; ')
+    }
+  }
+
+  $evidenceRefs = @(Get-RkSpecialistStrings -Value (Get-RkProperty -Object $Report -Name 'evidence_refs'))
+  $normalized = [pscustomobject][ordered]@{
+    role = ([string](Get-RkProperty -Object $Report -Name 'role')).Trim()
+    evidence_refs = $evidenceRefs
+    conclusion = ([string](Get-RkProperty -Object $Report -Name 'conclusion')).Trim()
+    residual_risk = ([string](Get-RkProperty -Object $Report -Name 'residual_risk')).Trim()
+    recommended_next_action = ([string](Get-RkProperty -Object $Report -Name 'recommended_next_action')).Trim()
+  }
+  foreach ($field in @('role', 'conclusion', 'residual_risk', 'recommended_next_action')) {
+    if ([string]::IsNullOrWhiteSpace((Get-RkProperty -Object $normalized -Name $field))) {
+      return [pscustomobject][ordered]@{
+        accepted = $false
+        over_budget = $false
+        report_tokens = $null
+        report = $null
+        telemetry_record = $null
+        rejection_reason = ('specialist report field is empty: ' + $field)
+      }
+    }
+  }
+  if ($evidenceRefs.Count -eq 0) {
+    return [pscustomobject][ordered]@{
+      accepted = $false
+      over_budget = $false
+      report_tokens = $null
+      report = $null
+      telemetry_record = $null
+      rejection_reason = 'specialist report evidence_refs is empty'
+    }
+  }
+
+  $serialized = $normalized | ConvertTo-Json -Compress -Depth 20
+  $reportTokens = Get-RkTokenizerEstimate -Text $serialized -Python $Python
+  $overBudget = $reportTokens -gt $script:SpecialistReportTokenMax
+  $reason = if ($overBudget) {
+    'specialist report exceeds the provisional build-estimate token target'
+  }
+  else {
+    $null
+  }
+  return [pscustomobject][ordered]@{
+    accepted = -not $overBudget
+    over_budget = $overBudget
+    report_tokens = $reportTokens
+    report = $normalized
+    telemetry_record = [pscustomobject][ordered]@{
+      role = $normalized.role
+      evidence_refs = @($normalized.evidence_refs)
+      conclusion = $normalized.conclusion
+      residual_risk = $normalized.residual_risk
+      recommended_next_action = $normalized.recommended_next_action
+      report_tokens = $reportTokens
+    }
+    rejection_reason = $reason
+  }
+}
+
+function Decide-ReasonKitSpecialist {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Request,
+    [Parameter(Mandatory = $true)]
+    [object]$RunState
+  )
+
+  $requestProperties = @()
+  if ($null -ne $Request -and $null -ne $Request.PSObject) {
+    $requestProperties = @($Request.PSObject.Properties.Name | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+  }
+  $knownRequestFields = @(
+    'consideration_signals', 'hypotheses', 'evidence_state', 'evidence_attempted',
+    'evidence_resolved', 'material_uncertainty', 'risk', 'verification_state',
+    'selected_complexity', 'caller_role', 'request_kind', 'requested_role',
+    'expected_value', 'adversarial_review', 'remaining_budget'
+  )
+  if ($null -eq $Request -or $requestProperties.Count -eq 0 -or
+      @($requestProperties | Where-Object { $knownRequestFields -contains $_ }).Count -eq 0) {
+    throw 'Specialist Gate request must be a non-empty structured object.'
+  }
+  Assert-RkRunState -RunState $RunState
+
+  $hypotheses = @(Get-RkSpecialistStrings -Value (Get-RkProperty -Object $Request -Name 'hypotheses') | Sort-Object -Unique)
+  $hypothesisCount = $hypotheses.Count
+  $evidenceState = [string](Get-RkProperty -Object $Request -Name 'evidence_state')
+  if ([string]::IsNullOrWhiteSpace($evidenceState)) {
+    $evidenceState = 'not_attempted'
+  }
+  $verificationState = [string](Get-RkProperty -Object $Request -Name 'verification_state')
+  if ([string]::IsNullOrWhiteSpace($verificationState)) {
+    $verificationState = 'unknown'
+  }
+  $risk = ([string](Get-RkProperty -Object $Request -Name 'risk')).ToLowerInvariant()
+  if ([string]::IsNullOrWhiteSpace($risk)) {
+    $risk = 'low'
+  }
+  $triggers = @(Get-RkSpecialistSignals -Request $Request -HypothesisCount $hypothesisCount -EvidenceState $evidenceState -VerificationState $verificationState -Risk $risk)
+  $considered = $triggers.Count -gt 0
+  $requestKind = ([string](Get-RkProperty -Object $Request -Name 'request_kind')).ToLowerInvariant()
+  if ([string]::IsNullOrWhiteSpace($requestKind)) {
+    $requestKind = 'delegate'
+  }
+  $callerRole = ([string](Get-RkProperty -Object $Request -Name 'caller_role')).ToLowerInvariant()
+  if ([string]::IsNullOrWhiteSpace($callerRole)) {
+    $callerRole = 'hub'
+  }
+  $requestedRole = ([string](Get-RkProperty -Object $Request -Name 'requested_role')).Trim()
+  $expectedValue = Get-RkProperty -Object $Request -Name 'expected_value'
+  if ($null -ne $expectedValue) {
+    $expectedValue = ([string]$expectedValue).Trim()
+  }
+  $isAdversarial = [bool](Get-RkProperty -Object $Request -Name 'adversarial_review') -or
+    $requestedRole.ToLowerInvariant() -eq 'adversarial-reviewer'
+  $authorizedBefore = @($RunState.specialists_authorized).Count
+  $adversarialAuthorizationsBefore = [int]$RunState.adversarial_authorizations
+  $adversarialBefore = [int]$RunState.adversarial_passes
+  $budgetBefore = Get-RkSpecialistBudget `
+    -Request $Request `
+    -AuthorizedCount $authorizedBefore `
+    -AdversarialPasses $adversarialBefore `
+    -AdversarialAuthorizations $adversarialAuthorizationsBefore
+  $evidenceAttempted = [bool](Get-RkProperty -Object $Request -Name 'evidence_attempted')
+  $evidenceResolved = Test-RkSpecialistEvidenceResolved -Request $Request -EvidenceState $evidenceState
+  $materialUncertainty = [bool](Get-RkProperty -Object $Request -Name 'material_uncertainty')
+  $decision = 'NO_SPAWN'
+  $rejectionReason = $null
+  $validityEvent = $null
+  $authorizedRole = $null
+  $authorizedAfter = $authorizedBefore
+  $authorizationId = $null
+  $adversarialAuthorizationsAfter = $adversarialAuthorizationsBefore
+  $adversarialAfter = $adversarialBefore
+
+  if ($callerRole -in @('specialist', 'agent')) {
+    $decision = 'REJECTED'
+    $rejectionReason = 'specialists cannot invoke or delegate to another specialist'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'recursive_specialist_request'; reason = $rejectionReason }
+  }
+  elseif ($requestKind -in @('specialist_to_specialist', 'peer_conversation', 'vote', 'consensus', 'majority', 'recursive_spawn')) {
+    $decision = 'REJECTED'
+    $rejectionReason = 'requested specialist interaction is forbidden'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'negative_invariant'; reason = $requestKind }
+  }
+  elseif (-not $considered) {
+    if (-not [string]::IsNullOrWhiteSpace($requestedRole)) {
+      $decision = 'REJECTED'
+      $rejectionReason = 'specialist request lacks a valid consideration signal'
+      $validityEvent = [pscustomobject][ordered]@{ type = 'request_without_signal'; reason = $rejectionReason }
+    }
+    else {
+      $rejectionReason = 'no specialist consideration signal'
+    }
+  }
+  elseif ($evidenceResolved) {
+    $rejectionReason = 'deterministic evidence resolved uncertainty'
+  }
+  elseif (-not $materialUncertainty -and $risk -notin @('high', 'material', 'irreversible')) {
+    $rejectionReason = 'remaining uncertainty is not material'
+  }
+  elseif (-not $evidenceAttempted -and $evidenceState -notin @('unavailable', 'inadequate')) {
+    $rejectionReason = 'deterministic evidence has not been attempted'
+  }
+  elseif ([string]::IsNullOrWhiteSpace($requestedRole)) {
+    $rejectionReason = 'bounded specialist role is missing'
+  }
+  elseif ($budgetBefore.specialists_remaining -le 0 -or $authorizedBefore -ge $script:SpecialistMax) {
+    $decision = 'REJECTED'
+    $rejectionReason = 'specialist cap exceeded'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'specialist_cap_exceeded'; reason = $rejectionReason }
+  }
+  elseif ([string]::IsNullOrWhiteSpace([string]$expectedValue)) {
+    $rejectionReason = 'bounded specialist expected value is missing'
+  }
+  elseif ($isAdversarial -and ($budgetBefore.adversarial_authorizations_remaining -le 0 -or $adversarialAuthorizationsBefore -ge $script:AdversarialMax)) {
+    $decision = 'REJECTED'
+    $rejectionReason = 'adversarial review cap exceeded'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'adversarial_cap_exceeded'; reason = $rejectionReason }
+  }
+  else {
+    $decision = 'AUTHORIZED'
+    $authorizedRole = $requestedRole
+    $authorizedAfter++
+    $authorizationId = 'specialist-' + ($authorizedAfter.ToString())
+    $null = $RunState.specialists_authorized.Add([pscustomobject][ordered]@{
+      authorization_id = $authorizationId
+      role = $requestedRole
+      trigger = @($triggers)
+      expected_value = $expectedValue
+      evidence_state = $evidenceState
+      considered = $considered
+      competing_hypotheses = $hypothesisCount
+      adversarial = $isAdversarial
+      started = $false
+    })
+    if ($isAdversarial) {
+      $adversarialAuthorizationsAfter++
+      $RunState.adversarial_authorizations = $adversarialAuthorizationsAfter
+    }
+  }
+
+  $specialistConsumed = if ($decision -eq 'AUTHORIZED') { 1 } else { 0 }
+  $adversarialAuthorizationConsumed = if ($decision -eq 'AUTHORIZED' -and $isAdversarial) { 1 } else { 0 }
+  $budget = [pscustomobject][ordered]@{
+    specialist_cap = $script:SpecialistMax
+    adversarial_cap = $script:AdversarialMax
+    authorized_count_before = $authorizedBefore
+    authorized_count_after = $authorizedAfter
+    specialists_remaining_before = $budgetBefore.specialists_remaining
+    specialists_remaining_after = [Math]::Max(0, $budgetBefore.specialists_remaining - $specialistConsumed)
+    adversarial_authorizations_before = $adversarialAuthorizationsBefore
+    adversarial_authorizations_after = $adversarialAuthorizationsAfter
+    adversarial_authorizations_remaining_before = $budgetBefore.adversarial_authorizations_remaining
+    adversarial_authorizations_remaining_after = [Math]::Max(0, $budgetBefore.adversarial_authorizations_remaining - $adversarialAuthorizationConsumed)
+    adversarial_passes_before = $adversarialBefore
+    adversarial_passes_after = $adversarialAfter
+    adversarial_passes_remaining_before = [Math]::Max(0, $script:AdversarialMax - $adversarialBefore)
+    adversarial_passes_remaining_after = [Math]::Max(0, $script:AdversarialMax - $adversarialAfter)
+  }
+  $schemaGate = [pscustomobject][ordered]@{
+    considered = $considered
+    started = $false
+    trigger = @($triggers)
+    evidence_state = $evidenceState
+    competing_hypotheses = $hypothesisCount
+    rejection_reason = $rejectionReason
+    role = $authorizedRole
+  }
+  $specialistRoles = @($RunState.roles_started)
+  $telemetry = [pscustomobject][ordered]@{
+    specialist_gate = $schemaGate
+    specialist_roles = @($specialistRoles)
+    specialist_count = @($RunState.specialists_started).Count
+    specialist_reports = @()
+  }
+  $providerMeasurements = [pscustomobject][ordered]@{
+    input_tokens = $null
+    cached_input_tokens = $null
+    output_tokens = $null
+    reasoning_tokens = $null
+    total_tokens = $null
+    tool_calls = $null
+    agent_count = $null
+    duration_seconds = $null
+  }
+  $null = $RunState.prior_decisions.Add([pscustomobject][ordered]@{
+    decision = $decision
+    considered = $considered
+    trigger = @($triggers)
+    role = $authorizedRole
+    authorization_id = $authorizationId
+    validity_event = if ($null -eq $validityEvent) { $null } else { $validityEvent.type }
+  })
+  return [pscustomobject][ordered]@{
+    decision = $decision
+    considered = $considered
+    started = $false
+    trigger = @($triggers)
+    evidence_state = $evidenceState
+    competing_hypotheses = $hypothesisCount
+    rejection_reason = $rejectionReason
+    role = $authorizedRole
+    authorization_id = $authorizationId
+    expected_value = $expectedValue
+    budget = $budget
+    validity_event = $validityEvent
+    telemetry = $telemetry
+    provider_measurements = $providerMeasurements
+  }
+}
+
+function New-RkSpecialistLifecycleResult {
+  param(
+    [string]$Decision,
+    [bool]$Started,
+    [object]$AuthorizationRecord,
+    [string]$AuthorizationId,
+    [string]$Role,
+    [AllowNull()]
+    [object]$RejectionReason,
+    [object]$ValidityEvent,
+    [object]$RunState
+  )
+
+  $considered = if ($null -eq $AuthorizationRecord) { $false } else { [bool](Get-RkProperty -Object $AuthorizationRecord -Name 'considered') }
+  $trigger = if ($null -eq $AuthorizationRecord) { @() } else { @(Get-RkProperty -Object $AuthorizationRecord -Name 'trigger') }
+  $evidenceState = if ($null -eq $AuthorizationRecord) { 'not_available' } else { [string](Get-RkProperty -Object $AuthorizationRecord -Name 'evidence_state') }
+  if ([string]::IsNullOrWhiteSpace($evidenceState)) {
+    $evidenceState = 'not_available'
+  }
+  $hypothesisCount = if ($null -eq $AuthorizationRecord) { 0 } else { [int](Get-RkProperty -Object $AuthorizationRecord -Name 'competing_hypotheses') }
+  $expectedValue = if ($null -eq $AuthorizationRecord) { $null } else { Get-RkProperty -Object $AuthorizationRecord -Name 'expected_value' }
+  $startedCount = @($RunState.specialists_started).Count
+  $startedRoles = @($RunState.roles_started)
+  $schemaGate = [pscustomobject][ordered]@{
+    considered = $considered
+    started = $Started
+    trigger = @($trigger)
+    evidence_state = $evidenceState
+    competing_hypotheses = $hypothesisCount
+    rejection_reason = $RejectionReason
+    role = if ([string]::IsNullOrWhiteSpace($Role)) { $null } else { $Role }
+  }
+  $telemetry = [pscustomobject][ordered]@{
+    specialist_gate = $schemaGate
+    specialist_roles = @($startedRoles)
+    specialist_count = $startedCount
+    specialist_reports = @()
+  }
+  $providerMeasurements = [pscustomobject][ordered]@{
+    input_tokens = $null
+    cached_input_tokens = $null
+    output_tokens = $null
+    reasoning_tokens = $null
+    total_tokens = $null
+    tool_calls = $null
+    agent_count = $null
+    duration_seconds = $null
+  }
+  return [pscustomobject][ordered]@{
+    decision = $Decision
+    transition = if ($Started) { 'STARTED' } else { 'REJECTED' }
+    started = $Started
+    authorization_id = if ([string]::IsNullOrWhiteSpace($AuthorizationId)) { $null } else { $AuthorizationId }
+    considered = $considered
+    trigger = @($trigger)
+    evidence_state = $evidenceState
+    competing_hypotheses = $hypothesisCount
+    rejection_reason = $RejectionReason
+    role = if ([string]::IsNullOrWhiteSpace($Role)) { $null } else { $Role }
+    expected_value = $expectedValue
+    budget = [pscustomobject][ordered]@{
+      specialist_cap = $script:SpecialistMax
+      started_count = $startedCount
+      specialists_remaining = [Math]::Max(0, $script:SpecialistMax - $startedCount)
+      authorized_count = @($RunState.specialists_authorized).Count
+      adversarial_authorizations = [int]$RunState.adversarial_authorizations
+      adversarial_passes = [int]$RunState.adversarial_passes
+      adversarial_cap = $script:AdversarialMax
+    }
+    validity_event = $ValidityEvent
+    telemetry = $telemetry
+    provider_measurements = $providerMeasurements
+  }
+}
+
+function Record-ReasonKitSpecialistStart {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Authorization,
+    [Parameter(Mandatory = $true)]
+    [object]$RunState,
+    [Parameter(Mandatory = $false)]
+    [string]$Role,
+    [Parameter(Mandatory = $false)]
+    [string]$CallerRole = 'hub'
+  )
+
+  Assert-RkRunState -RunState $RunState
+  $authorizationId = ([string](Get-RkProperty -Object $Authorization -Name 'authorization_id')).Trim()
+  $authorizationDecision = [string](Get-RkProperty -Object $Authorization -Name 'decision')
+  $authorizationRecords = @(
+    $RunState.specialists_authorized |
+      Where-Object { (Get-RkProperty -Object $_ -Name 'authorization_id') -eq $authorizationId }
+  )
+  $authorizationRecord = if ($authorizationRecords.Count -eq 1) { $authorizationRecords[0] } else { $null }
+  $requestedRole = ([string]$Role).Trim()
+  if ([string]::IsNullOrWhiteSpace($requestedRole) -and $null -ne $authorizationRecord) {
+    $requestedRole = ([string](Get-RkProperty -Object $authorizationRecord -Name 'role')).Trim()
+  }
+  $normalizedCallerRole = ([string]$CallerRole).Trim().ToLowerInvariant()
+  if ([string]::IsNullOrWhiteSpace($normalizedCallerRole)) {
+    $normalizedCallerRole = 'hub'
+  }
+
+  $rejectionReason = $null
+  $validityEvent = $null
+  if ($normalizedCallerRole -in @('specialist', 'agent')) {
+    $rejectionReason = 'specialists cannot start or delegate another specialist'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'recursive_specialist_start'; reason = $rejectionReason }
+  }
+  elseif ([string]::IsNullOrWhiteSpace($authorizationId) -or
+      $authorizationDecision -ne 'AUTHORIZED' -or
+      $null -eq $authorizationRecord) {
+    $rejectionReason = 'specialist start requires an existing valid authorization'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'start_without_authorization'; reason = $rejectionReason }
+  }
+  elseif ($requestedRole -cne ([string](Get-RkProperty -Object $authorizationRecord -Name 'role')).Trim()) {
+    $rejectionReason = 'specialist start role does not match the authorization'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'specialist_role_mismatch'; reason = $rejectionReason }
+  }
+  elseif ([bool](Get-RkProperty -Object $authorizationRecord -Name 'started') -or
+      @($RunState.specialists_started | Where-Object { (Get-RkProperty -Object $_ -Name 'authorization_id') -eq $authorizationId }).Count -gt 0) {
+    $rejectionReason = 'specialist authorization has already been started'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'duplicate_specialist_start'; reason = $rejectionReason }
+  }
+  elseif (@($RunState.specialists_started).Count -ge $script:SpecialistMax) {
+    $rejectionReason = 'specialist execution cap exceeded'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'specialist_cap_exceeded'; reason = $rejectionReason }
+  }
+  elseif ([bool](Get-RkProperty -Object $authorizationRecord -Name 'adversarial') -and
+      [int]$RunState.adversarial_passes -ge $script:AdversarialMax) {
+    $rejectionReason = 'adversarial execution cap exceeded'
+    $validityEvent = [pscustomobject][ordered]@{ type = 'adversarial_cap_exceeded'; reason = $rejectionReason }
+  }
+
+  if ($null -ne $rejectionReason) {
+    $null = $RunState.prior_decisions.Add([pscustomobject][ordered]@{
+      decision = 'REJECTED'
+      transition = 'REJECTED'
+      authorization_id = if ([string]::IsNullOrWhiteSpace($authorizationId)) { $null } else { $authorizationId }
+      role = if ([string]::IsNullOrWhiteSpace($requestedRole)) { $null } else { $requestedRole }
+      validity_event = $validityEvent.type
+    })
+    return New-RkSpecialistLifecycleResult `
+      -Decision 'REJECTED' `
+      -Started $false `
+      -AuthorizationRecord $authorizationRecord `
+      -AuthorizationId $authorizationId `
+      -Role $requestedRole `
+      -RejectionReason $rejectionReason `
+      -ValidityEvent $validityEvent `
+      -RunState $RunState
+  }
+
+  $authorizationRecord.started = $true
+  $startedRecord = [pscustomobject][ordered]@{
+    authorization_id = $authorizationId
+    role = $requestedRole
+    adversarial = [bool](Get-RkProperty -Object $authorizationRecord -Name 'adversarial')
+    started = $true
+    order = @($RunState.specialists_started).Count + 1
+  }
+  $null = $RunState.specialists_started.Add($startedRecord)
+  if (@($RunState.roles_started) -notcontains $requestedRole) {
+    $null = $RunState.roles_started.Add($requestedRole)
+  }
+  if ($startedRecord.adversarial) {
+    $RunState.adversarial_passes = [int]$RunState.adversarial_passes + 1
+  }
+  $null = $RunState.prior_decisions.Add([pscustomobject][ordered]@{
+    decision = 'STARTED'
+    transition = 'STARTED'
+    authorization_id = $authorizationId
+    role = $requestedRole
+    validity_event = $null
+  })
+  return New-RkSpecialistLifecycleResult `
+    -Decision 'STARTED' `
+    -Started $true `
+    -AuthorizationRecord $authorizationRecord `
+    -AuthorizationId $authorizationId `
+    -Role $requestedRole `
+    -RejectionReason $null `
+    -ValidityEvent $null `
+    -RunState $RunState
+}
+
 function Resolve-ReasonKitContext {
   [CmdletBinding()]
   param(
@@ -753,5 +1378,8 @@ function Resolve-ReasonKitContext {
 Export-ModuleMember -Function @(
   'Read-ReasonKitModuleRegistry',
   'New-ReasonKitRunState',
-  'Resolve-ReasonKitContext'
+  'Resolve-ReasonKitContext',
+  'Decide-ReasonKitSpecialist',
+  'Record-ReasonKitSpecialistStart',
+  'Test-ReasonKitSpecialistReport'
 )

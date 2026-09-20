@@ -505,6 +505,97 @@ function Assert-LoaderTelemetrySchema {
   return $document
 }
 
+function New-Phase3Request {
+  param(
+    [string[]]$ConsiderationSignals = @(),
+    [string[]]$Hypotheses = @(),
+    [string]$EvidenceState = 'not_attempted',
+    [bool]$EvidenceAttempted = $false,
+    [bool]$EvidenceResolved = $false,
+    [bool]$MaterialUncertainty = $false,
+    [string]$Risk = 'low',
+    [string]$VerificationState = 'deterministic',
+    [string]$SelectedComplexity = 'L1',
+    [string]$CallerRole = 'hub',
+    [string]$RequestKind = 'delegate',
+    [string]$RequestedRole = $null,
+    [string]$ExpectedValue = $null,
+    [bool]$AdversarialReview = $false
+  )
+
+  return [pscustomobject][ordered]@{
+    consideration_signals = @($ConsiderationSignals)
+    hypotheses = @($Hypotheses)
+    evidence_state = $EvidenceState
+    evidence_attempted = $EvidenceAttempted
+    evidence_resolved = $EvidenceResolved
+    material_uncertainty = $MaterialUncertainty
+    risk = $Risk
+    verification_state = $VerificationState
+    selected_complexity = $SelectedComplexity
+    caller_role = $CallerRole
+    request_kind = $RequestKind
+    requested_role = $RequestedRole
+    expected_value = $ExpectedValue
+    adversarial_review = $AdversarialReview
+  }
+}
+
+function Assert-Phase3Decision {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Decision,
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedDecision,
+    [Parameter(Mandatory = $true)]
+    [bool]$ExpectedConsidered
+  )
+
+  if ($Decision.decision -ne $ExpectedDecision -or
+      $Decision.considered -ne $ExpectedConsidered -or
+      $Decision.started -ne $false) {
+    throw ('Unexpected Phase 3 decision: ' + $Name)
+  }
+  if ($null -eq $Decision.telemetry -or $null -eq $Decision.telemetry.specialist_gate) {
+    throw ('Phase 3 decision telemetry is missing: ' + $Name)
+  }
+}
+
+function Assert-Phase3TelemetrySchema {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$BaseDocument,
+    [Parameter(Mandatory = $true)]
+    [object]$Decision,
+    [Parameter(Mandatory = $true)]
+    [string]$SchemaPath,
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  $document = ($BaseDocument | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+  $document.specialists = $Decision.telemetry
+  $document.provider_measurements = $Decision.provider_measurements
+  $json = $document | ConvertTo-Json -Depth 80 -Compress
+  try {
+    $valid = Test-Json -Json $json -SchemaFile $SchemaPath -ErrorAction Stop
+  }
+  catch {
+    throw ('Phase 3 telemetry schema validation failed: ' + $Name + ': ' + $_.Exception.Message)
+  }
+  if ($valid -ne $true) {
+    throw ('Phase 3 telemetry schema validation returned false: ' + $Name)
+  }
+  $allowedGateFields = @('considered', 'started', 'trigger', 'evidence_state', 'competing_hypotheses', 'rejection_reason', 'role')
+  $extraGateFields = @($Decision.telemetry.specialist_gate.PSObject.Properties.Name | Where-Object { $allowedGateFields -notcontains $_ })
+  if ($extraGateFields.Count -gt 0) {
+    throw ('Phase 3 schema-bound gate telemetry leaked fields: ' + ($extraGateFields -join ', '))
+  }
+  return $document
+}
+
 Push-Location $script:PhaseRoot
 try {
   $resolvedBaseline = Invoke-GitText -Arguments @('rev-parse', ($script:BaselineCommit + '^{commit}'))
@@ -1431,6 +1522,382 @@ try {
   if ($signatureA -cne $signatureB -or $planA.full_bundle_loaded -ne $planB.full_bundle_loaded) {
     throw 'Identical loader input did not produce an identical context plan.'
   }
+
+  # Phase 3 — RK2-03 Specialist Gate synthetic seam tests.
+  $phase3State = New-ReasonKitRunState
+  $phase3NoTrigger = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request) `
+    -RunState $phase3State
+  Assert-Phase3Decision -Decision $phase3NoTrigger -Name 'no trigger' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $false
+  $phase3RecordA = $phase3NoTrigger
+
+  $phase3SingleCause = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -EvidenceState 'resolved_by_local_verification' -EvidenceAttempted $true -EvidenceResolved $true) `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $phase3SingleCause -Name 'single supported cause' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $false
+
+  $phase3Collapsed = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('competing_hypotheses') -Hypotheses @('cause-a', 'cause-b') -EvidenceState 'resolved_by_test' -EvidenceAttempted $true -EvidenceResolved $true) `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $phase3Collapsed -Name 'hypotheses collapsed' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $true
+  $phase3RecordB = $phase3Collapsed
+
+  $phase3ConflictState = New-ReasonKitRunState
+  $phase3ConflictRequest = New-Phase3Request `
+    -ConsiderationSignals @('conflicting_evidence') `
+    -Hypotheses @('cause-a', 'cause-b') `
+    -EvidenceState 'conflicting_unresolved' `
+    -EvidenceAttempted $true `
+    -MaterialUncertainty $true `
+    -Risk 'material' `
+    -RequestedRole 'investigator' `
+    -ExpectedValue 'independent causal comparison'
+  $phase3Conflict = Decide-ReasonKitSpecialist -Request $phase3ConflictRequest -RunState $phase3ConflictState
+  Assert-Phase3Decision -Decision $phase3Conflict -Name 'unresolved conflict' -ExpectedDecision 'AUTHORIZED' -ExpectedConsidered $true
+  if ($phase3Conflict.role -ne 'investigator' -or
+      $phase3Conflict.telemetry.specialist_count -ne 0 -or
+      @($phase3Conflict.telemetry.specialist_roles).Count -ne 0 -or
+      $phase3Conflict.provider_measurements.agent_count -ne $null) {
+    throw 'First specialist authorization did not remain distinct from actual specialist start.'
+  }
+  $phase3RecordC = $phase3Conflict
+
+  $lifecycleState = New-ReasonKitRunState
+  $lifecycleAuthorization = Decide-ReasonKitSpecialist -Request $phase3ConflictRequest -RunState $lifecycleState
+  if ($lifecycleAuthorization.decision -ne 'AUTHORIZED' -or
+      $lifecycleAuthorization.started -ne $false -or
+      $lifecycleAuthorization.telemetry.specialist_count -ne 0 -or
+      @($lifecycleAuthorization.telemetry.specialist_roles).Count -ne 0 -or
+      $lifecycleAuthorization.provider_measurements.agent_count -ne $null) {
+    throw 'Fresh authorization was incorrectly reported as an actual specialist start.'
+  }
+  $phase3RecordAuthorizationOnly = $lifecycleAuthorization
+
+  $startedLifecycle = Record-ReasonKitSpecialistStart `
+    -Authorization $lifecycleAuthorization `
+    -RunState $lifecycleState
+  if ($startedLifecycle.decision -ne 'STARTED' -or
+      $startedLifecycle.started -ne $true -or
+      $startedLifecycle.telemetry.specialist_gate.started -ne $true -or
+      $startedLifecycle.telemetry.specialist_count -ne 1 -or
+      @($startedLifecycle.telemetry.specialist_roles | Where-Object { $_ -eq 'investigator' }).Count -ne 1 -or
+      $startedLifecycle.provider_measurements.agent_count -ne $null) {
+    throw 'External specialist start was not recorded with actual started semantics.'
+  }
+  $null = Assert-Phase3TelemetrySchema `
+    -BaseDocument $minimalTelemetryRoundTrip `
+    -Decision $startedLifecycle `
+    -SchemaPath $telemetrySchemaPath `
+    -Name 'started-agent'
+  $phase3RecordStarted = $startedLifecycle
+
+  $duplicateStart = Record-ReasonKitSpecialistStart `
+    -Authorization $lifecycleAuthorization `
+    -RunState $lifecycleState
+  if ($duplicateStart.decision -ne 'REJECTED' -or
+      $duplicateStart.validity_event.type -ne 'duplicate_specialist_start' -or
+      $duplicateStart.telemetry.specialist_count -ne 1) {
+    throw 'Duplicate specialist start was not rejected without incrementing the started count.'
+  }
+  $phase3RecordDuplicateStart = $duplicateStart
+
+  $recursiveStart = Record-ReasonKitSpecialistStart `
+    -Authorization $lifecycleAuthorization `
+    -RunState $lifecycleState `
+    -CallerRole 'specialist'
+  if ($recursiveStart.decision -ne 'REJECTED' -or
+      $recursiveStart.validity_event.type -ne 'recursive_specialist_start' -or
+      $recursiveStart.telemetry.specialist_count -ne 1) {
+    throw 'Recursive specialist-originated start was not rejected.'
+  }
+  $phase3RecordRecursiveStart = $recursiveStart
+
+  $startWithoutAuthorization = Record-ReasonKitSpecialistStart `
+    -Authorization ([pscustomobject][ordered]@{ authorization_id = 'missing-authorization'; role = 'investigator' }) `
+    -RunState (New-ReasonKitRunState)
+  if ($startWithoutAuthorization.decision -ne 'REJECTED' -or
+      $startWithoutAuthorization.validity_event.type -ne 'start_without_authorization' -or
+      $startWithoutAuthorization.telemetry.specialist_count -ne 0) {
+    throw 'Start without a valid authorization was not rejected.'
+  }
+  $phase3RecordStartWithoutAuthorization = $startWithoutAuthorization
+
+  $roleMismatchState = New-ReasonKitRunState
+  $roleMismatchAuthorization = Decide-ReasonKitSpecialist -Request $phase3ConflictRequest -RunState $roleMismatchState
+  $roleMismatch = Record-ReasonKitSpecialistStart `
+    -Authorization $roleMismatchAuthorization `
+    -RunState $roleMismatchState `
+    -Role 'verifier'
+  if ($roleMismatch.decision -ne 'REJECTED' -or
+      $roleMismatch.validity_event.type -ne 'specialist_role_mismatch' -or
+      $roleMismatch.telemetry.specialist_count -ne 0) {
+    throw 'Role-mismatched specialist start was not rejected.'
+  }
+
+  $multiStartState = New-ReasonKitRunState
+  $multiStartRequests = @(
+    New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'investigator' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -ExpectedValue 'bounded investigator value'
+    New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'verifier' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -ExpectedValue 'bounded verifier value'
+    New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'implementer' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -ExpectedValue 'bounded implementer value'
+  )
+  $multiStartResults = [System.Collections.Generic.List[object]]::new()
+  foreach ($multiStartRequest in $multiStartRequests) {
+    $multiAuthorization = Decide-ReasonKitSpecialist -Request $multiStartRequest -RunState $multiStartState
+    if ($multiAuthorization.decision -ne 'AUTHORIZED') {
+      throw 'A valid second or third specialist authorization was unexpectedly rejected.'
+    }
+    $multiStarted = Record-ReasonKitSpecialistStart -Authorization $multiAuthorization -RunState $multiStartState
+    if ($multiStarted.decision -ne 'STARTED') {
+      throw 'A valid second or third specialist start was unexpectedly rejected.'
+    }
+    $null = $multiStartResults.Add($multiStarted)
+  }
+  $thirdStart = $multiStartResults[2]
+  if ($thirdStart.telemetry.specialist_count -ne 3 -or
+      @($thirdStart.telemetry.specialist_roles).Count -ne 3) {
+    throw 'Third specialist start did not produce the bounded count and role ledger.'
+  }
+  $pendingAuthorization = [pscustomobject][ordered]@{
+    authorization_id = 'specialist-pending'
+    role = 'reference-researcher'
+    trigger = @('conflicting_evidence')
+    expected_value = 'bounded pending authorization'
+    evidence_state = 'conflicting_unresolved'
+    considered = $true
+    competing_hypotheses = 0
+    adversarial = $false
+    started = $false
+  }
+  $null = $multiStartState.specialists_authorized.Add($pendingAuthorization)
+  $capStartAuthorization = [pscustomobject][ordered]@{
+    decision = 'AUTHORIZED'
+    authorization_id = 'specialist-pending'
+    role = 'reference-researcher'
+  }
+  $capStart = Record-ReasonKitSpecialistStart -Authorization $capStartAuthorization -RunState $multiStartState
+  if ($capStart.decision -ne 'REJECTED' -or
+      $capStart.validity_event.type -ne 'specialist_cap_exceeded' -or
+      $capStart.telemetry.specialist_count -ne 3) {
+    throw 'Specialist start after the execution cap was not rejected.'
+  }
+  $phase3RecordCapStart = $capStart
+
+  foreach ($complexity in @('L3', 'L4')) {
+    $complexityDecision = Decide-ReasonKitSpecialist `
+      -Request (New-Phase3Request -SelectedComplexity $complexity) `
+      -RunState (New-ReasonKitRunState)
+    Assert-Phase3Decision -Decision $complexityDecision -Name ($complexity + ' alone') -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $false
+  }
+  $unsureDecision = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('uncertainty')) `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $unsureDecision -Name 'uncertainty alone' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $false
+
+  $unfamiliarResolved = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('unfamiliar_external_domain') -EvidenceState 'resolved_by_authoritative_query' -EvidenceAttempted $true -EvidenceResolved $true) `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $unfamiliarResolved -Name 'unfamiliar domain resolved' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $true
+
+  $highImpact = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('high_impact_irreversible') -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -Risk 'material') `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $highImpact -Name 'high impact consideration' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $true
+
+  $nondeterministic = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('nondeterministic_verification') -EvidenceState 'nondeterministic') `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $nondeterministic -Name 'nondeterministic verification' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $true
+
+  $creative = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('unresolved_creative_direction') -EvidenceState 'unresolved') `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $creative -Name 'unresolved creative direction' -ExpectedDecision 'NO_SPAWN' -ExpectedConsidered $true
+
+  $requestWithoutSignal = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -RequestedRole 'investigator') `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $requestWithoutSignal -Name 'request without signal' -ExpectedDecision 'REJECTED' -ExpectedConsidered $false
+
+  $recursive = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -CallerRole 'specialist' -RequestKind 'delegate' -RequestedRole 'verifier' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true) `
+    -RunState (New-ReasonKitRunState)
+  Assert-Phase3Decision -Decision $recursive -Name 'recursive specialist request' -ExpectedDecision 'REJECTED' -ExpectedConsidered $true
+  $phase3RecordD = $recursive
+
+  Assert-Throws -Name 'malformed gate request' -Script {
+    Decide-ReasonKitSpecialist -Request ([pscustomobject]@{}) -RunState (New-ReasonKitRunState)
+  }
+
+  foreach ($forbiddenRequest in @('specialist_to_specialist', 'peer_conversation', 'vote', 'consensus')) {
+    $forbiddenDecision = Decide-ReasonKitSpecialist `
+      -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestKind $forbiddenRequest -RequestedRole 'investigator' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true) `
+      -RunState (New-ReasonKitRunState)
+    Assert-Phase3Decision -Decision $forbiddenDecision -Name $forbiddenRequest -ExpectedDecision 'REJECTED' -ExpectedConsidered $true
+  }
+
+  $capState = New-ReasonKitRunState
+  foreach ($role in @('investigator', 'verifier', 'implementer')) {
+    $capDecision = Decide-ReasonKitSpecialist `
+      -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole $role -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -ExpectedValue ('bounded ' + $role)) `
+      -RunState $capState
+    Assert-Phase3Decision -Decision $capDecision -Name ('specialist authorization ' + $role) -ExpectedDecision 'AUTHORIZED' -ExpectedConsidered $true
+  }
+  $fourth = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'reference-researcher' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true) `
+    -RunState $capState
+  Assert-Phase3Decision -Decision $fourth -Name 'fourth specialist' -ExpectedDecision 'REJECTED' -ExpectedConsidered $true
+  if ($fourth.validity_event.type -ne 'specialist_cap_exceeded') {
+    throw 'Fourth specialist rejection was not recorded as a validity event.'
+  }
+  $phase3RecordE = $fourth
+
+  $adversarialState = New-ReasonKitRunState
+  $firstAdversarial = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'adversarial-reviewer' -ExpectedValue 'bounded adversarial review' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -AdversarialReview $true) `
+    -RunState $adversarialState
+  Assert-Phase3Decision -Decision $firstAdversarial -Name 'first adversarial pass' -ExpectedDecision 'AUTHORIZED' -ExpectedConsidered $true
+  $secondAdversarial = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'adversarial-reviewer' -ExpectedValue 'bounded adversarial review' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -AdversarialReview $true) `
+    -RunState $adversarialState
+  Assert-Phase3Decision -Decision $secondAdversarial -Name 'second adversarial pass' -ExpectedDecision 'REJECTED' -ExpectedConsidered $true
+  if ($secondAdversarial.validity_event.type -ne 'adversarial_cap_exceeded') {
+    throw 'Second adversarial rejection was not recorded as a validity event.'
+  }
+  $phase3RecordF = $secondAdversarial
+
+  $adversarialLifecycleState = New-ReasonKitRunState
+  $adversarialLifecycleAuthorization = Decide-ReasonKitSpecialist `
+    -Request (New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -RequestedRole 'adversarial-reviewer' -ExpectedValue 'bounded adversarial review' -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -AdversarialReview $true) `
+    -RunState $adversarialLifecycleState
+  $adversarialLifecycleStart = Record-ReasonKitSpecialistStart `
+    -Authorization $adversarialLifecycleAuthorization `
+    -RunState $adversarialLifecycleState
+  if ($adversarialLifecycleStart.decision -ne 'STARTED' -or
+      $adversarialLifecycleStart.telemetry.specialist_gate.started -ne $true -or
+      $adversarialLifecycleStart.telemetry.specialist_count -ne 1) {
+    throw 'First adversarial start did not produce actual-start telemetry.'
+  }
+  $secondAdversarialStart = Record-ReasonKitSpecialistStart `
+    -Authorization $adversarialLifecycleAuthorization `
+    -RunState $adversarialLifecycleState
+  if ($secondAdversarialStart.decision -ne 'REJECTED' -or
+      $secondAdversarialStart.validity_event.type -ne 'duplicate_specialist_start') {
+    throw 'Second adversarial start was not rejected and recorded.'
+  }
+
+  $validReport = [pscustomobject][ordered]@{
+    role = 'investigator'
+    evidence_refs = @('test:conflicting-evidence', 'test:reproduction')
+    conclusion = 'The remaining cause is bounded to the observed seam.'
+    residual_risk = 'One external integration remains unverified.'
+    recommended_next_action = 'Run the named verification check.'
+  }
+  $validReportResult = Test-ReasonKitSpecialistReport -Report $validReport -Python $python
+  if ($validReportResult.accepted -ne $true -or $validReportResult.report_tokens -le 0) {
+    throw 'Valid bounded specialist report was not accepted.'
+  }
+  $phase3RecordG = $validReportResult
+
+  $missingReportField = [pscustomobject][ordered]@{
+    role = 'investigator'
+    evidence_refs = @('test:missing-field')
+    conclusion = 'Incomplete report.'
+    residual_risk = 'Unknown.'
+  }
+  $missingReportResult = Test-ReasonKitSpecialistReport -Report $missingReportField -Python $python
+  if ($missingReportResult.accepted -ne $false) {
+    throw 'Specialist report missing a required field was accepted.'
+  }
+  $rawTranscriptReport = [pscustomobject][ordered]@{
+    role = 'investigator'
+    evidence_refs = @('test:raw-transcript')
+    conclusion = 'Structured conclusion.'
+    residual_risk = 'Low.'
+    recommended_next_action = 'Verify.'
+    raw_transcript = 'This field is forbidden.'
+  }
+  $rawTranscriptResult = Test-ReasonKitSpecialistReport -Report $rawTranscriptReport -Python $python
+  if ($rawTranscriptResult.accepted -ne $false) {
+    throw 'Specialist report containing a raw transcript was accepted.'
+  }
+  $oversizedReport = [pscustomobject][ordered]@{
+    role = 'investigator'
+    evidence_refs = @('test:oversized')
+    conclusion = ('x' * 5000)
+    residual_risk = 'High.'
+    recommended_next_action = 'Reduce the report.'
+  }
+  $oversizedResult = Test-ReasonKitSpecialistReport -Report $oversizedReport -Python $python
+  if ($oversizedResult.accepted -ne $false -or
+      $oversizedResult.over_budget -ne $true -or
+      $oversizedResult.report_tokens -le 512) {
+    throw 'Oversized bounded specialist report was not surfaced correctly.'
+  }
+  $phase3RecordH = $oversizedResult
+
+  $null = Assert-Phase3TelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Decision $phase3NoTrigger -SchemaPath $telemetrySchemaPath -Name 'no-agent'
+  $null = Assert-Phase3TelemetrySchema -BaseDocument $minimalTelemetryRoundTrip -Decision $phase3Conflict -SchemaPath $telemetrySchemaPath -Name 'authorized-specialist'
+  if ($phase3Conflict.telemetry.specialist_count -ne 0 -or
+      @($phase3Conflict.telemetry.specialist_roles).Count -ne 0 -or
+      $phase3Conflict.provider_measurements.agent_count -ne $null) {
+    throw 'ReasonKit specialist_count was not kept distinct from provider agent_count.'
+  }
+
+  $deterministicRequest = New-Phase3Request -ConsiderationSignals @('conflicting_evidence') -Hypotheses @('cause-a', 'cause-b') -EvidenceState 'conflicting_unresolved' -EvidenceAttempted $true -MaterialUncertainty $true -RequestedRole 'investigator' -ExpectedValue 'bounded evidence value'
+  $deterministicA = Decide-ReasonKitSpecialist -Request $deterministicRequest -RunState (New-ReasonKitRunState)
+  $deterministicB = Decide-ReasonKitSpecialist -Request $deterministicRequest -RunState (New-ReasonKitRunState)
+  $deterministicJsonA = $deterministicA | ConvertTo-Json -Compress -Depth 50
+  $deterministicJsonB = $deterministicB | ConvertTo-Json -Compress -Depth 50
+  if ($deterministicJsonA -cne $deterministicJsonB) {
+    throw 'Identical Specialist Gate inputs did not produce identical decisions.'
+  }
+  $deterministicLifecycleStateA = New-ReasonKitRunState
+  $deterministicLifecycleAuthA = Decide-ReasonKitSpecialist -Request $deterministicRequest -RunState $deterministicLifecycleStateA
+  $deterministicLifecycleStartA = Record-ReasonKitSpecialistStart -Authorization $deterministicLifecycleAuthA -RunState $deterministicLifecycleStateA
+  $deterministicLifecycleStateB = New-ReasonKitRunState
+  $deterministicLifecycleAuthB = Decide-ReasonKitSpecialist -Request $deterministicRequest -RunState $deterministicLifecycleStateB
+  $deterministicLifecycleStartB = Record-ReasonKitSpecialistStart -Authorization $deterministicLifecycleAuthB -RunState $deterministicLifecycleStateB
+  $deterministicStartJsonA = $deterministicLifecycleStartA | ConvertTo-Json -Compress -Depth 50
+  $deterministicStartJsonB = $deterministicLifecycleStartB | ConvertTo-Json -Compress -Depth 50
+  if ($deterministicStartJsonA -cne $deterministicStartJsonB) {
+    throw 'Identical specialist start inputs did not produce identical lifecycle decisions.'
+  }
+  if ($phase3Conflict.started -ne $false -or
+      $phase3Conflict.provider_measurements.input_tokens -ne $null -or
+      $phase3Conflict.provider_measurements.output_tokens -ne $null) {
+    throw 'Specialist Gate appears to have started a provider or fabricated provider measurements.'
+  }
+  if ($startedLifecycle.provider_measurements.input_tokens -ne $null -or
+      $startedLifecycle.provider_measurements.output_tokens -ne $null -or
+      $startedLifecycle.started -ne $true) {
+    throw 'Specialist start seam fabricated provider usage or failed to record the external start.'
+  }
+
+  Write-Output 'rk2_03_no_spawn_tests=PASS'
+  Write-Output 'rk2_03_authorization_tests=PASS'
+  Write-Output 'rk2_03_lifecycle_tests=PASS'
+  Write-Output 'rk2_03_negative_invariant_tests=PASS'
+  Write-Output 'rk2_03_specialist_cap_tests=PASS'
+  Write-Output 'rk2_03_adversarial_cap_tests=PASS'
+  Write-Output 'rk2_03_report_shape_tests=PASS'
+  Write-Output 'rk2_03_report_budget_tests=PASS'
+  Write-Output 'rk2_03_telemetry_schema_tests=PASS'
+  Write-Output 'rk2_03_determinism_tests=PASS'
+  Write-Output 'rk2_03_lifecycle_determinism_tests=PASS'
+  Write-Output ('rk2_03_record_A=' + ($phase3RecordA | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_B=' + ($phase3RecordB | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_C=' + ($phase3RecordC | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_I=' + ($phase3RecordAuthorizationOnly | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_J=' + ($phase3RecordStarted | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_K=' + ($phase3RecordDuplicateStart | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_L=' + ($phase3RecordStartWithoutAuthorization | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_M=' + ($phase3RecordRecursiveStart | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_N=' + ($phase3RecordCapStart | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_D=' + ($phase3RecordD | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_E=' + ($phase3RecordE | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_F=' + ($phase3RecordF | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_G=' + ($phase3RecordG | ConvertTo-Json -Compress -Depth 30))
+  Write-Output ('rk2_03_record_H=' + ($phase3RecordH | ConvertTo-Json -Compress -Depth 30))
 
   Write-Output 'Phase 0 v0.2 synthetic tests passed'
   Write-Output ('baseline_commit=' + $script:BaselineCommit)
