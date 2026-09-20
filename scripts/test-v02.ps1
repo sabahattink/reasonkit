@@ -1918,31 +1918,13 @@ try {
 
     $phase4MutationRepo = Join-Path $phase4TempRoot 'mutation-repo'
     New-Item -ItemType Directory -Force -Path $phase4MutationRepo | Out-Null
-    foreach ($requiredPath in @(
-        'core/tiny-kernel.md',
-        'core/module-registry.json',
-        'core/specialist-gate.md',
-        'core/telemetry.schema.json',
-        'core/candidate-manifest.schema.json',
-        'scripts/reasonkit-v02.psm1',
-        'scripts/run-benchmark.ps1'
-    )) {
+    foreach ($coveredFile in @($phase4Candidate.covered_files)) {
+      $requiredPath = [string]$coveredFile.repository_relative_path
       $sourcePath = Join-Path $script:PhaseRoot ($requiredPath -replace '/', '\')
       $destinationPath = Join-Path $phase4MutationRepo ($requiredPath -replace '/', '\')
       New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
       Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
     }
-    $mutationRegistry = Get-Content -Raw -LiteralPath (Join-Path $phase4MutationRepo 'core/module-registry.json') | ConvertFrom-Json -Depth 20
-    foreach ($mutationModule in @($mutationRegistry.modules)) {
-      $moduleRelativePath = [string]$mutationModule.source_path
-      $sourcePath = Join-Path $script:PhaseRoot ($moduleRelativePath -replace '/', '\')
-      $destinationPath = Join-Path $phase4MutationRepo ($moduleRelativePath -replace '/', '\')
-      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
-      Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
-    }
-    $mutationDistRoot = Join-Path $phase4MutationRepo 'dist/v0.2'
-    New-Item -ItemType Directory -Force -Path $mutationDistRoot | Out-Null
-    Copy-Item -Path (Join-Path $script:PhaseRoot 'dist/v0.2/*') -Destination $mutationDistRoot -Recurse -Force
     $mutationKernelPath = Join-Path $phase4MutationRepo 'core/tiny-kernel.md'
     $mutationKernelBytes = [IO.File]::ReadAllBytes($mutationKernelPath)
     if ($mutationKernelBytes.Length -eq 0) {

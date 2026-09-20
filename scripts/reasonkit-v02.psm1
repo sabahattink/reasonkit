@@ -1448,6 +1448,36 @@ function Add-RkCandidateFileRecord {
     -ModuleId $ModuleId))
 }
 
+function Add-RkCandidateDirectoryRecords {
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.Collections.Generic.List[object]]$Records,
+    [Parameter(Mandatory = $true)]
+    [hashtable]$Seen,
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRelativeDirectory,
+    [Parameter(Mandatory = $true)]
+    [string]$Role
+  )
+
+  $canonicalDirectory = Normalize-RkPath -Path $RepositoryRelativeDirectory
+  $absoluteDirectory = Join-Path $RepositoryRoot ($canonicalDirectory -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $absoluteDirectory -PathType Container)) {
+    throw ('Candidate covered directory is missing: ' + $canonicalDirectory)
+  }
+  $files = @(Get-ChildItem -LiteralPath $absoluteDirectory -Recurse -File | Sort-Object FullName)
+  if ($files.Count -eq 0) {
+    throw ('Candidate covered directory is empty: ' + $canonicalDirectory)
+  }
+  foreach ($file in $files) {
+    $relative = [IO.Path]::GetRelativePath($RepositoryRoot, $file.FullName).Replace('\', '/')
+    Add-RkCandidateFileRecord -Records $Records -Seen $Seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $relative -Role $Role
+  }
+}
+
 function Get-RkCandidateCoverage {
   param(
     [Parameter(Mandatory = $true)]
@@ -1483,6 +1513,9 @@ function Get-RkCandidateCoverage {
     [pscustomobject]@{ path = 'core/candidate-manifest.schema.json'; role = 'candidate_schema' }
     [pscustomobject]@{ path = 'scripts/reasonkit-v02.psm1'; role = 'implementation_module' }
     [pscustomobject]@{ path = 'scripts/run-benchmark.ps1'; role = 'runner' }
+    [pscustomobject]@{ path = 'scripts/validate.ps1'; role = 'other' }
+    [pscustomobject]@{ path = 'scripts/test-v02.ps1'; role = 'other' }
+    [pscustomobject]@{ path = 'scripts/test-phase6.ps1'; role = 'other' }
   )) {
     Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
       -RepositoryRelativePath $entry.path -Role $entry.role
@@ -1502,12 +1535,43 @@ function Get-RkCandidateCoverage {
       -RepositoryRelativePath $relative -Role 'generated_artifact'
   }
 
-  foreach ($adapterPath in @($AdapterPaths)) {
+  foreach ($adapterPath in @('adapters/generic/SYSTEM.md') + @($AdapterPaths)) {
     if ([string]::IsNullOrWhiteSpace($adapterPath)) {
+      continue
+    }
+    if ($seen.ContainsKey((Normalize-RkPath -Path $adapterPath))) {
       continue
     }
     Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
       -RepositoryRelativePath $adapterPath -Role 'adapter'
+  }
+
+  Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+    -RepositoryRelativePath 'evals/benchmark-v0.2.json' -Role 'other'
+  foreach ($benchmarkFile in @(
+      'evals/debugging/TASK-001.md'
+      'evals/creative/TASK-002.md'
+      'evals/debugging/TASK-003.md'
+      'evals/debugging/TASK-003.acceptance.md'
+  )) {
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $benchmarkFile -Role 'other'
+  }
+  foreach ($benchmarkDirectory in @(
+      'evals/debugging/fixtures/task-001'
+      'evals/creative/fixtures/task-002'
+      'evals/debugging/fixtures/task-003'
+      'evals/debugging/evaluator-only/TASK-003/reference-fixed'
+  )) {
+    Add-RkCandidateDirectoryRecords -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativeDirectory $benchmarkDirectory -Role 'other'
+  }
+  foreach ($evaluatorFile in @(
+      'evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js'
+      'evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1'
+  )) {
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $evaluatorFile -Role 'other'
   }
 
   return @($records.ToArray() | Sort-Object { $_['repository_relative_path'] })

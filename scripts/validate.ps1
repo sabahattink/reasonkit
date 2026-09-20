@@ -32,6 +32,7 @@ try {
     'adapters/generic/SYSTEM.md',
     'evals/arms/reliable-engineering-v0.1.md',
     'evals/benchmark.json',
+    'evals/benchmark-v0.2.json',
     'evals/debugging/TASK-001.md',
     'evals/debugging/fixtures/task-001/parser.js',
     'evals/debugging/fixtures/task-001/parser.test.js',
@@ -44,6 +45,14 @@ try {
     'evals/creative/fixtures/task-002/public/mark.svg',
     'evals/creative/fixtures/task-002/public/README.md',
     'evals/creative/fixtures/task-002/acceptance.md',
+    'evals/debugging/TASK-003.md',
+    'evals/debugging/TASK-003.acceptance.md',
+    'evals/debugging/fixtures/task-003/package.json',
+    'evals/debugging/fixtures/task-003/src/worker.js',
+    'evals/debugging/fixtures/task-003/tests/worker.test.js',
+    'evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js',
+    'evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1',
+    'evals/debugging/evaluator-only/TASK-003/reference-fixed/src/worker.js',
     'docs/REASONKIT-V0.2-DESIGN-RESEARCH-SPEC.md',
     'core/telemetry.schema.json',
     'core/candidate-manifest.schema.json',
@@ -201,6 +210,11 @@ try {
   & .\scripts\test-v02.ps1
   if (-not $?) {
     throw 'Phase 0 v0.2 synthetic tests failed.'
+  }
+
+  & .\scripts\test-phase6.ps1
+  if (-not $?) {
+    throw 'Phase 6 provenance and binding tests failed.'
   }
 
   $global:LASTEXITCODE = 0

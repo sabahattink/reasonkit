@@ -27,7 +27,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$defaultManifestPath = Join-Path $root 'evals/benchmark.json'
+$defaultManifestPath = if ($Profile -eq 'v0.2') {
+  Join-Path $root 'evals/benchmark-v0.2.json'
+}
+else {
+  Join-Path $root 'evals/benchmark.json'
+}
 if ($Profile -eq 'v0.1' -and -not [string]::IsNullOrWhiteSpace($BenchmarkManifestPath)) {
   throw 'Benchmark manifest selection requires -Profile v0.2.'
 }
@@ -93,6 +98,51 @@ function Get-ManifestProperty {
     return $null
   }
   return $property.Value
+}
+
+function Get-FileProvenance {
+  param(
+    [string]$RelativePath,
+    [string]$ExpectedHash,
+    [string]$Label
+  )
+
+  if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedHash)) {
+      throw ('Manifest has a ' + $Label + ' hash without a file.')
+    }
+    return [pscustomobject][ordered]@{
+      RelativePath = $null
+      AbsolutePath = $null
+      Sha256 = $null
+      Bytes = 0
+      Verified = $true
+    }
+  }
+  if ([IO.Path]::IsPathRooted($RelativePath) -or
+      $RelativePath -match '(^|[\\/])\.\.([\\/]|$)') {
+    throw ($Label + ' must be a repository-relative path: ' + $RelativePath)
+  }
+  if ([string]::IsNullOrWhiteSpace($ExpectedHash)) {
+    throw ('Manifest is missing the ' + $Label + ' hash: ' + $RelativePath)
+  }
+
+  $absolutePath = Resolve-RepoPath $RelativePath
+  if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) {
+    throw ('Missing ' + $Label + ': ' + $RelativePath)
+  }
+  $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $absolutePath).Hash.ToLowerInvariant()
+  if ($actualHash -ne $ExpectedHash.ToLowerInvariant()) {
+    throw ($Label + ' hash mismatch: ' + $RelativePath)
+  }
+
+  return [pscustomobject][ordered]@{
+    RelativePath = $RelativePath.Replace('\\', '/')
+    AbsolutePath = $absolutePath
+    Sha256 = $actualHash
+    Bytes = (Get-Item -LiteralPath $absolutePath).Length
+    Verified = $true
+  }
 }
 
 function Get-SourceCommit {
@@ -405,6 +455,137 @@ function Get-InstructionProvenance {
   }
 }
 
+function Get-TaskProvenance {
+  param([object]$CaseItem)
+
+  if ($Profile -ne 'v0.2') {
+    return $null
+  }
+  $expectedHash = Get-ManifestProperty -Object $CaseItem -Name 'taskSha256'
+  if ([string]::IsNullOrWhiteSpace([string]$expectedHash)) {
+    return [pscustomobject][ordered]@{
+      RelativePath = $CaseItem.promptFile
+      AbsolutePath = Resolve-RepoPath $CaseItem.promptFile
+      Sha256 = $null
+      Bytes = 0
+      Verified = $false
+    }
+  }
+  return Get-FileProvenance `
+    -RelativePath ([string]$CaseItem.promptFile) `
+    -ExpectedHash ([string]$expectedHash) `
+    -Label 'task prompt'
+}
+
+function Get-AcceptanceProvenance {
+  param([object]$CaseItem)
+
+  return Get-FileProvenance `
+    -RelativePath ([string](Get-ManifestProperty -Object $CaseItem -Name 'acceptanceFile')) `
+    -ExpectedHash ([string](Get-ManifestProperty -Object $CaseItem -Name 'acceptanceSha256')) `
+    -Label 'acceptance material'
+}
+
+function Get-EvaluatorProvenance {
+  param([object]$CaseItem)
+
+  $evaluator = Get-ManifestProperty -Object $CaseItem -Name 'evaluator'
+  if ($null -eq $evaluator) {
+    return [pscustomobject][ordered]@{
+      Type = $null
+      Verifier = Get-FileProvenance -RelativePath $null -ExpectedHash $null -Label 'evaluator verifier'
+      HiddenRegression = Get-FileProvenance -RelativePath $null -ExpectedHash $null -Label 'hidden regression'
+      ReferenceFiles = @()
+      Verified = $true
+    }
+  }
+
+  $referenceFiles = @(
+    foreach ($reference in @($evaluator.referenceFiles)) {
+      $path = [string](Get-ManifestProperty -Object $reference -Name 'path')
+      $hash = [string](Get-ManifestProperty -Object $reference -Name 'sha256')
+      Get-FileProvenance -RelativePath $path -ExpectedHash $hash -Label 'evaluator reference'
+    }
+  )
+  return [pscustomobject][ordered]@{
+    Type = [string](Get-ManifestProperty -Object $evaluator -Name 'type')
+    Verifier = Get-FileProvenance `
+      -RelativePath ([string](Get-ManifestProperty -Object $evaluator -Name 'verifierPath')) `
+      -ExpectedHash ([string](Get-ManifestProperty -Object $evaluator -Name 'verifierSha256')) `
+      -Label 'evaluator verifier'
+    HiddenRegression = Get-FileProvenance `
+      -RelativePath ([string](Get-ManifestProperty -Object $evaluator -Name 'hiddenRegressionPath')) `
+      -ExpectedHash ([string](Get-ManifestProperty -Object $evaluator -Name 'hiddenRegressionSha256')) `
+      -Label 'hidden regression'
+    ReferenceFiles = $referenceFiles
+    Verified = $true
+  }
+}
+
+function Get-V02BindingProvenance {
+  param(
+    [object]$CaseItem,
+    [object]$ArmItem,
+    [object]$CandidateBinding
+  )
+
+  if ($Profile -ne 'v0.2' -or $ArmItem.id -ne 'C') {
+    return $null
+  }
+
+  $binding = Get-ManifestProperty -Object $CaseItem -Name 'v02Binding'
+  if ($null -eq $binding) {
+    throw ('v0.2 Arm C binding is missing for ' + $CaseItem.id)
+  }
+  if ((Get-ManifestProperty -Object $binding -Name 'fullBundleFallback') -ne $false) {
+    throw ('v0.2 Arm C must disable full-bundle fallback for ' + $CaseItem.id)
+  }
+
+  $adapter = Get-FileProvenance `
+    -RelativePath ([string](Get-ManifestProperty -Object $binding -Name 'adapterPath')) `
+    -ExpectedHash ([string](Get-ManifestProperty -Object $binding -Name 'adapterSha256')) `
+    -Label 'v0.2 adapter'
+  $kernel = Get-FileProvenance `
+    -RelativePath ([string](Get-ManifestProperty -Object $binding -Name 'kernelPath')) `
+    -ExpectedHash ([string](Get-ManifestProperty -Object $binding -Name 'kernelSha256')) `
+    -Label 'v0.2 kernel artifact'
+  $registry = Get-FileProvenance `
+    -RelativePath ([string](Get-ManifestProperty -Object $binding -Name 'registryPath')) `
+    -ExpectedHash ([string](Get-ManifestProperty -Object $binding -Name 'registrySha256')) `
+    -Label 'v0.2 module registry'
+  $implementation = Get-FileProvenance `
+    -RelativePath ([string](Get-ManifestProperty -Object $binding -Name 'implementationPath')) `
+    -ExpectedHash ([string](Get-ManifestProperty -Object $binding -Name 'implementationSha256')) `
+    -Label 'v0.2 loader implementation'
+
+  if ([string]$kernel.RelativePath -eq 'dist/reasonkit-debugging.md' -or
+      [string]$adapter.RelativePath -eq 'dist/reasonkit-debugging.md') {
+    throw 'v0.2 Arm C cannot bind the frozen v0.1 debugging bundle.'
+  }
+  if ($null -ne $CandidateBinding) {
+    $adapterEntry = Get-CandidateCoveredEntry -CandidateManifest $CandidateBinding.manifest -Path $adapter.RelativePath
+    if ($null -eq $adapterEntry -or $adapterEntry.role -ne 'adapter') {
+      throw ('v0.2 adapter is not covered by the candidate manifest: ' + $adapter.RelativePath)
+    }
+    if ($CandidateBinding.adapter_sha256 -cne $adapter.Sha256) {
+      throw 'Candidate adapter binding does not match the v0.2 Arm C adapter.'
+    }
+    if ($CandidateBinding.kernel_sha256 -cne $kernel.Sha256 -or
+        $CandidateBinding.module_manifest_sha256 -cne $registry.Sha256) {
+      throw 'Candidate kernel or module registry does not match the v0.2 Arm C binding.'
+    }
+  }
+
+  return [pscustomobject][ordered]@{
+    Adapter = $adapter
+    Kernel = $kernel
+    Registry = $registry
+    Implementation = $implementation
+    Route = [string](Get-ManifestProperty -Object $binding -Name 'route')
+    FullBundleFallback = $false
+  }
+}
+
 function Copy-FrozenWorkspace {
   param(
     [string]$SourcePath,
@@ -422,6 +603,102 @@ function Copy-FrozenWorkspace {
   }
 }
 
+function Get-ExecutableCommand {
+  param([string[]]$Names)
+
+  foreach ($name in $Names) {
+    $command = Get-Command $name -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+      return $command.Source
+    }
+  }
+  return $null
+}
+
+function Invoke-Task003PostRunEvaluator {
+  param(
+    [object]$Evaluator,
+    [string]$WorkspacePath,
+    [string]$RunPath
+  )
+
+  if ($Evaluator.Type -ne 'task-003-held-out-concurrency') {
+    throw ('Unsupported post-run evaluator type: ' + $Evaluator.Type)
+  }
+
+  $stagePath = Join-Path $RunPath 'evaluator-stage'
+  $stageFixturePath = Join-Path $stagePath 'fixture-public'
+  $stageEvaluatorPath = Join-Path $stagePath 'evaluator-only'
+  New-Item -ItemType Directory -Force -Path $stageEvaluatorPath | Out-Null
+  Copy-FrozenWorkspace -SourcePath $WorkspacePath -TargetPath $stageFixturePath
+
+  $hiddenTarget = Join-Path $stageEvaluatorPath 'hidden-concurrency-regression.js'
+  Copy-Item -LiteralPath $Evaluator.HiddenRegression.AbsolutePath -Destination $hiddenTarget -Force
+  $referenceTarget = Join-Path $stageEvaluatorPath 'reference-fixed/src'
+  New-Item -ItemType Directory -Force -Path $referenceTarget | Out-Null
+  foreach ($reference in @($Evaluator.ReferenceFiles)) {
+    $evaluatorSourceRoot = Split-Path -Parent (
+      Split-Path -Parent (
+        Split-Path -Parent $reference.AbsolutePath
+      )
+    )
+    $relative = [IO.Path]::GetRelativePath(
+      $evaluatorSourceRoot,
+      $reference.AbsolutePath
+    ).Replace('\\', '/')
+    $destination = Join-Path $stagePath ('evaluator-only/' + $relative)
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+    Copy-Item -LiteralPath $reference.AbsolutePath -Destination $destination -Force
+  }
+
+  $node = Get-ExecutableCommand -Names @('node.exe', 'node')
+  $npm = Get-ExecutableCommand -Names @('npm.cmd', 'npm.exe', 'npm')
+  if ([string]::IsNullOrWhiteSpace($node) -or [string]::IsNullOrWhiteSpace($npm)) {
+    throw 'TASK-003 post-run evaluator requires node and npm.'
+  }
+
+  $lines = [System.Collections.Generic.List[string]]::new()
+  $publicExit = 1
+  $hiddenExit = 1
+  Push-Location $stageFixturePath
+  try {
+    $publicLines = @(
+      & $npm test 2>&1 |
+        ForEach-Object { $_.ToString() }
+    )
+    $publicExit = $LASTEXITCODE
+    foreach ($line in $publicLines) { $null = $lines.Add(('public: ' + $line)) }
+  }
+  finally {
+    Pop-Location
+  }
+
+  if ($publicExit -eq 0) {
+    $hiddenLines = @(
+      & $node $hiddenTarget $stagePath public 2>&1 |
+        ForEach-Object { $_.ToString() }
+    )
+    $hiddenExit = $LASTEXITCODE
+    foreach ($line in $hiddenLines) { $null = $lines.Add(('held_out: ' + $line)) }
+  }
+
+  $outputPath = Join-Path $RunPath 'evaluator-output.txt'
+  [IO.File]::WriteAllText(
+    $outputPath,
+    (($lines -join [Environment]::NewLine) + [Environment]::NewLine),
+    $utf8NoBom
+  )
+  return [pscustomobject][ordered]@{
+    status = if ($publicExit -eq 0 -and $hiddenExit -eq 0) { 'PASS' } else { 'FAIL' }
+    public_tests = if ($publicExit -eq 0) { 'PASS' } else { 'FAIL' }
+    held_out_regression = if ($hiddenExit -eq 0) { 'PASS' } else { 'FAIL' }
+    public_exit_code = $publicExit
+    held_out_exit_code = $hiddenExit
+    output_file = 'evaluator-output.txt'
+    evaluator_stage = 'evaluator-stage/'
+  }
+}
+
 function Write-JsonFile {
   param(
     [string]$Path,
@@ -436,7 +713,8 @@ function New-V02ContextPlan {
     [object]$CaseItem,
     [object]$ArmItem,
     [object]$Instruction,
-    [object]$CandidateBinding
+    [object]$CandidateBinding,
+    [object]$V02Binding
   )
 
   return [ordered]@{
@@ -448,6 +726,24 @@ function New-V02ContextPlan {
     instruction_bytes = [int64]$Instruction.Bytes
     kernel_sha256 = $CandidateBinding.kernel_sha256
     module_manifest_sha256 = $CandidateBinding.module_manifest_sha256
+    adapter_sha256 = $CandidateBinding.adapter_sha256
+    binding = if ($null -eq $V02Binding) {
+      $null
+    }
+    else {
+      [ordered]@{
+        adapter_path = $V02Binding.Adapter.RelativePath
+        adapter_sha256 = $V02Binding.Adapter.Sha256
+        kernel_path = $V02Binding.Kernel.RelativePath
+        kernel_sha256 = $V02Binding.Kernel.Sha256
+        registry_path = $V02Binding.Registry.RelativePath
+        registry_sha256 = $V02Binding.Registry.Sha256
+        implementation_path = $V02Binding.Implementation.RelativePath
+        implementation_sha256 = $V02Binding.Implementation.Sha256
+        route = $V02Binding.Route
+        full_bundle_fallback = $V02Binding.FullBundleFallback
+      }
+    }
     route = $null
     selected_complexity = $null
     modules_loaded = @()
@@ -512,8 +808,21 @@ function New-BenchmarkPacket {
 
   $promptPath = Resolve-RepoPath $CaseItem.promptFile
   $workspaceSourcePath = Resolve-RepoPath $CaseItem.workspaceSource
+  $taskProvenance = Get-TaskProvenance -CaseItem $CaseItem
+  $acceptance = Get-AcceptanceProvenance -CaseItem $CaseItem
+  $evaluator = Get-EvaluatorProvenance -CaseItem $CaseItem
+  $v02Binding = Get-V02BindingProvenance `
+    -CaseItem $CaseItem `
+    -ArmItem $ArmItem `
+    -CandidateBinding $CandidateBinding
   $instruction = Get-InstructionProvenance -CaseItem $CaseItem -ArmItem $ArmItem
   $fixtureSha256 = Get-DirectorySha256 -Directory $workspaceSourcePath
+  $expectedFixtureHash = Get-ManifestProperty -Object $CaseItem -Name 'workspaceSha256'
+  if ($Profile -eq 'v0.2' -and
+      -not [string]::IsNullOrWhiteSpace([string]$expectedFixtureHash) -and
+      [string]$fixtureSha256 -cne [string]$expectedFixtureHash) {
+    throw ('Workspace hash mismatch: ' + $CaseItem.workspaceSource)
+  }
   $sourceCommit = Get-SourceCommit
   $sourceDirty = Get-SourceDirty
 
@@ -522,6 +831,19 @@ function New-BenchmarkPacket {
     Copy-Item -LiteralPath $instruction.AbsolutePath -Destination (Join-Path $runPath 'instructions.md')
   }
   Copy-FrozenWorkspace -SourcePath $workspaceSourcePath -TargetPath $workspacePath
+  $acceptancePacketPath = $null
+  if ($acceptance.AbsolutePath) {
+    $acceptancePacketPath = Join-Path $workspacePath 'acceptance.md'
+    if ([IO.Path]::GetFullPath($acceptance.AbsolutePath) -ne
+        [IO.Path]::GetFullPath($acceptancePacketPath)) {
+      Copy-Item -LiteralPath $acceptance.AbsolutePath -Destination $acceptancePacketPath -Force
+    }
+  }
+  $adapterPacketPath = $null
+  if ($null -ne $v02Binding) {
+    $adapterPacketPath = Join-Path $runPath 'adapter.md'
+    Copy-Item -LiteralPath $v02Binding.Adapter.AbsolutePath -Destination $adapterPacketPath -Force
+  }
 
   $metrics = [ordered]@{
     input_tokens = $null
@@ -596,6 +918,55 @@ function New-BenchmarkPacket {
     $metadata['module_manifest_sha256'] = $CandidateBinding.module_manifest_sha256
     $metadata['runner_sha256'] = $CandidateBinding.runner_sha256
     $metadata['adapter_sha256'] = $CandidateBinding.adapter_sha256
+    $metadata['task_sha256'] = $taskProvenance.Sha256
+    $metadata['acceptance_file'] = if ($null -eq $acceptancePacketPath) { $null } else { 'workspace/acceptance.md' }
+    $metadata['acceptance_sha256'] = $acceptance.Sha256
+    $metadata['acceptance_bytes'] = $acceptance.Bytes
+    $metadata['evaluator'] = if ($evaluator.Verifier.RelativePath) {
+      [ordered]@{
+        type = $evaluator.Type
+        run_after_provider = $true
+        verifier = [ordered]@{
+          path = $evaluator.Verifier.RelativePath
+          expected_sha256 = $evaluator.Verifier.Sha256
+          verified_sha256 = $evaluator.Verifier.Sha256
+          verified = $evaluator.Verifier.Verified
+        }
+        hidden_regression = [ordered]@{
+          path = $evaluator.HiddenRegression.RelativePath
+          expected_sha256 = $evaluator.HiddenRegression.Sha256
+          verified_sha256 = $evaluator.HiddenRegression.Sha256
+          verified = $evaluator.HiddenRegression.Verified
+        }
+        reference_files = @(
+          foreach ($reference in @($evaluator.ReferenceFiles)) {
+            [ordered]@{
+              path = $reference.RelativePath
+              expected_sha256 = $reference.Sha256
+              verified_sha256 = $reference.Sha256
+              verified = $reference.Verified
+            }
+          }
+        )
+      }
+    }
+    else {
+      $null
+    }
+    $metadata['v02_binding'] = if ($null -eq $v02Binding) { $null } else {
+      [ordered]@{
+        adapter_path = $v02Binding.Adapter.RelativePath
+        adapter_sha256 = $v02Binding.Adapter.Sha256
+        kernel_path = $v02Binding.Kernel.RelativePath
+        kernel_sha256 = $v02Binding.Kernel.Sha256
+        registry_path = $v02Binding.Registry.RelativePath
+        registry_sha256 = $v02Binding.Registry.Sha256
+        implementation_path = $v02Binding.Implementation.RelativePath
+        implementation_sha256 = $v02Binding.Implementation.Sha256
+        route = $v02Binding.Route
+        full_bundle_fallback = $v02Binding.FullBundleFallback
+      }
+    }
     $metadata['telemetry_schema_version'] = '0.2'
     $metadata['telemetry_file'] = (Join-Path $relativeOutput 'telemetry.json').Replace('\', '/')
     $metadata['recovery_of'] = if ($null -eq $RecoveryReference) { $null } else { $RecoveryReference.run_id }
@@ -605,7 +976,8 @@ function New-BenchmarkPacket {
       -CaseItem $CaseItem `
       -ArmItem $ArmItem `
       -Instruction $instruction `
-      -CandidateBinding $CandidateBinding
+      -CandidateBinding $CandidateBinding `
+      -V02Binding $v02Binding
     Write-JsonFile -Path $contextPlanPath -Value $contextPlan
   }
 
@@ -672,6 +1044,11 @@ function New-BenchmarkPacket {
     $environment['REASONKIT_TELEMETRY_FILE'] = $telemetryPath
     $environment['REASONKIT_CONTEXT_PLAN_FILE'] = $contextPlanPath
     $environment['REASONKIT_RECOVERY_OF'] = if ($null -eq $RecoveryReference) { '' } else { $RecoveryReference.run_id }
+    $environment['REASONKIT_ACCEPTANCE_FILE'] = if ($null -eq $acceptancePacketPath) { '' } else { $acceptancePacketPath }
+    $environment['REASONKIT_V02_ADAPTER_FILE'] = if ($null -eq $adapterPacketPath) { '' } else { $adapterPacketPath }
+    $environment['REASONKIT_V02_KERNEL_FILE'] = if ($null -eq $v02Binding) { '' } else { Join-Path $runPath 'instructions.md' }
+    $environment['REASONKIT_V02_ROUTE'] = if ($null -eq $v02Binding) { '' } else { $v02Binding.Route }
+    $environment['REASONKIT_V02_FULL_BUNDLE_FALLBACK'] = if ($null -eq $v02Binding) { '' } else { [string]$v02Binding.FullBundleFallback }
   }
 
   foreach ($name in $environment.Keys) {
@@ -707,6 +1084,29 @@ function New-BenchmarkPacket {
     $metadata.status = if ($exitCode -eq 0) { 'completed' } else { 'failed' }
     $metadata.exit_code = $exitCode
     $metadata.duration_seconds = ((Get-Date) - $started).TotalSeconds
+
+    if ($Profile -eq 'v0.2' -and
+        $exitCode -eq 0 -and
+        $null -ne $evaluator.Verifier.RelativePath) {
+      try {
+        $evaluatorResult = Invoke-Task003PostRunEvaluator `
+          -Evaluator $evaluator `
+          -WorkspacePath $workspacePath `
+          -RunPath $runPath
+        $metadata['evaluator_result'] = $evaluatorResult
+        if ($evaluatorResult.status -ne 'PASS') {
+          $metadata.status = 'failed'
+        }
+      }
+      catch {
+        $evaluatorResult = [ordered]@{
+          status = 'ERROR'
+          error = $_.Exception.Message
+        }
+        $metadata['evaluator_result'] = $evaluatorResult
+        $metadata.status = 'failed'
+      }
+    }
   }
   finally {
     foreach ($name in $environment.Keys) {

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "delivery-1001-a",
+    "dedupeKey": "payment-1001",
+    "type": "charge",
+    "amount": 1250,
+    "customer": "customer-7"
+  },
+  {
+    "id": "delivery-1002-a",
+    "dedupeKey": "payment-1002",
+    "type": "refund",
+    "amount": 640,
+    "customer": "customer-9"
+  }
+]
