@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('TASK-001', 'TASK-002')]
   [string]$Case,
 
   [ValidateSet('A', 'B', 'C', 'D')]
@@ -12,15 +11,49 @@ param(
 
   [string]$OutputRoot = 'evals/runs',
 
+  [string]$BenchmarkManifestPath,
+
+  [ValidateSet('v0.1', 'v0.2')]
+  [string]$Profile = 'v0.1',
+
+  [string]$CandidateManifestPath,
+
+  [string]$RecoveryOf,
+
+  [string[]]$AdapterPath = @(),
+
   [switch]$PrepareAll
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$manifestPath = Join-Path $root 'evals/benchmark.json'
+$defaultManifestPath = Join-Path $root 'evals/benchmark.json'
+if ($Profile -eq 'v0.1' -and -not [string]::IsNullOrWhiteSpace($BenchmarkManifestPath)) {
+  throw 'Benchmark manifest selection requires -Profile v0.2.'
+}
+$manifestPath = if ([string]::IsNullOrWhiteSpace($BenchmarkManifestPath)) {
+  $defaultManifestPath
+}
+elseif ([IO.Path]::IsPathRooted($BenchmarkManifestPath)) {
+  $BenchmarkManifestPath
+}
+else {
+  Join-Path $root $BenchmarkManifestPath
+}
+if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+  throw ('Benchmark manifest is missing: ' + $manifestPath)
+}
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $newLine = [string][char]10
+$candidateBinding = $null
+
+if ($Profile -eq 'v0.1' -and (
+    -not [string]::IsNullOrWhiteSpace($CandidateManifestPath) -or
+    @($AdapterPath).Count -gt 0 -or
+    -not [string]::IsNullOrWhiteSpace($RecoveryOf))) {
+  throw 'Candidate binding parameters require -Profile v0.2.'
+}
 
 function Resolve-RepoPath {
   param([string]$RelativePath)
@@ -85,6 +118,225 @@ function Get-SourceDirty {
   )
   $global:LASTEXITCODE = 0
   return ($status.Count -gt 0)
+}
+
+function Resolve-InputPath {
+  param([string]$Path)
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return $null
+  }
+  if ([IO.Path]::IsPathRooted($Path)) {
+    return $Path
+  }
+  return Join-Path $root $Path
+}
+
+function Read-Utf8NoBomText {
+  param([string]$Path)
+
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  if ($bytes.Length -ge 3 -and
+      $bytes[0] -eq 0xEF -and
+      $bytes[1] -eq 0xBB -and
+      $bytes[2] -eq 0xBF) {
+    throw 'Candidate manifest must be UTF-8 without a BOM.'
+  }
+  $encoding = New-Object System.Text.UTF8Encoding($false, $true)
+  try {
+    return $encoding.GetString($bytes)
+  }
+  catch {
+    throw ('Candidate manifest is not valid UTF-8: ' + $_.Exception.Message)
+  }
+}
+
+function Get-CandidateCoveredEntry {
+  param(
+    [object]$CandidateManifest,
+    [string]$Path
+  )
+
+  $canonical = $Path.Replace('\', '/')
+  return @(
+    $CandidateManifest.covered_files |
+      Where-Object { $_.repository_relative_path -eq $canonical }
+  ) | Select-Object -First 1
+}
+
+function Read-V02CandidateBinding {
+  if ([string]::IsNullOrWhiteSpace($CandidateManifestPath)) {
+    throw 'Profile v0.2 requires -CandidateManifestPath.'
+  }
+  $modulePath = Join-Path $root 'scripts/reasonkit-v02.psm1'
+  Import-Module -Name $modulePath -Force
+
+  $manifestAbsolutePath = Resolve-InputPath -Path $CandidateManifestPath
+  if (-not (Test-Path -LiteralPath $manifestAbsolutePath -PathType Leaf)) {
+    throw ('Candidate manifest is missing: ' + $CandidateManifestPath)
+  }
+  $manifestText = Read-Utf8NoBomText -Path $manifestAbsolutePath
+  $candidateManifest = $manifestText | ConvertFrom-Json -Depth 80
+  $sourceCommit = Get-SourceCommit
+  if ([string]::IsNullOrWhiteSpace($sourceCommit)) {
+    throw 'Cannot bind a candidate without a source commit.'
+  }
+  $null = Assert-ReasonKitCandidateManifest `
+    -Manifest $candidateManifest `
+    -RepositoryRoot $root `
+    -ExpectedSourceCommit $sourceCommit `
+    -SchemaPath (Join-Path $root 'core/candidate-manifest.schema.json') `
+    -ManifestText $manifestText
+
+  $adapterEntries = @(
+    $candidateManifest.covered_files |
+      Where-Object { $_.role -eq 'adapter' }
+  )
+  if (@($AdapterPath).Count -gt 1 -or $adapterEntries.Count -gt 1) {
+    throw 'The telemetry schema has one adapter_sha256; bind at most one selected adapter.'
+  }
+  if (@($AdapterPath).Count -eq 1) {
+    $adapterEntry = Get-CandidateCoveredEntry -CandidateManifest $candidateManifest -Path $AdapterPath[0]
+    if ($null -eq $adapterEntry -or $adapterEntry.role -ne 'adapter') {
+      throw ('Selected adapter is not covered by the candidate manifest: ' + $AdapterPath[0])
+    }
+  }
+  elseif ($adapterEntries.Count -eq 1) {
+    $adapterEntry = $adapterEntries[0]
+  }
+  else {
+    $adapterEntry = $null
+  }
+
+  $runnerEntry = Get-CandidateCoveredEntry -CandidateManifest $candidateManifest -Path 'scripts/run-benchmark.ps1'
+  $runnerSha = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $root 'scripts/run-benchmark.ps1')).Hash.ToLowerInvariant()
+  if ($null -eq $runnerEntry -or $runnerEntry.sha256 -cne $runnerSha) {
+    throw 'Candidate manifest runner hash does not match scripts/run-benchmark.ps1.'
+  }
+
+  return [pscustomobject][ordered]@{
+    manifest = $candidateManifest
+    candidate_id = $candidateManifest.candidate_id
+    candidate_version = $candidateManifest.candidate_version
+    candidate_manifest_sha256 = $candidateManifest.candidate_manifest_sha256.ToLowerInvariant()
+    source_commit = $candidateManifest.source_commit.ToLowerInvariant()
+    kernel_sha256 = $candidateManifest.kernel_sha256.ToLowerInvariant()
+    module_manifest_sha256 = $candidateManifest.module_manifest_sha256.ToLowerInvariant()
+    runner_sha256 = $runnerSha
+    adapter_sha256 = if ($null -eq $adapterEntry) { $null } else { $adapterEntry.sha256.ToLowerInvariant() }
+  }
+}
+
+function Assert-V02TelemetryBinding {
+  param(
+    [object]$Telemetry,
+    [object]$CandidateBinding
+  )
+
+  $identity = $Telemetry.identity
+  $provenance = $Telemetry.provenance
+  $checks = @(
+    [pscustomobject]@{ actual = $identity.candidate_id; expected = $CandidateBinding.candidate_id; name = 'candidate_id' }
+    [pscustomobject]@{ actual = $identity.candidate_version; expected = $CandidateBinding.candidate_version; name = 'candidate_version' }
+    [pscustomobject]@{ actual = $identity.candidate_manifest_sha256; expected = $CandidateBinding.candidate_manifest_sha256; name = 'candidate_manifest_sha256' }
+    [pscustomobject]@{ actual = $provenance.source_commit; expected = $CandidateBinding.source_commit; name = 'source_commit' }
+    [pscustomobject]@{ actual = $provenance.kernel_sha256; expected = $CandidateBinding.kernel_sha256; name = 'kernel_sha256' }
+    [pscustomobject]@{ actual = $provenance.module_manifest_sha256; expected = $CandidateBinding.module_manifest_sha256; name = 'module_manifest_sha256' }
+    [pscustomobject]@{ actual = $provenance.runner_sha256; expected = $CandidateBinding.runner_sha256; name = 'runner_sha256' }
+    [pscustomobject]@{ actual = $provenance.adapter_sha256; expected = $CandidateBinding.adapter_sha256; name = 'adapter_sha256' }
+  )
+  foreach ($check in $checks) {
+    if ([string]$check.actual -cne [string]$check.expected) {
+      throw ('Immutable telemetry provenance was changed: ' + $check.name)
+    }
+  }
+}
+
+function Get-MetricValue {
+  param(
+    [object]$Metrics,
+    [string]$Name
+  )
+
+  if ($null -eq $Metrics) {
+    return $null
+  }
+  $property = $Metrics.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return $null
+  }
+  return $property.Value
+}
+
+function Get-V02ProviderMeasurements {
+  param([object]$Metrics)
+
+  $source = if ($null -ne $Metrics.PSObject.Properties['provider_measurements']) {
+    $Metrics.provider_measurements
+  }
+  else {
+    $Metrics
+  }
+  return [ordered]@{
+    input_tokens = Get-MetricValue -Metrics $source -Name 'input_tokens'
+    cached_input_tokens = Get-MetricValue -Metrics $source -Name 'cached_input_tokens'
+    output_tokens = Get-MetricValue -Metrics $source -Name 'output_tokens'
+    reasoning_tokens = Get-MetricValue -Metrics $source -Name 'reasoning_tokens'
+    total_tokens = Get-MetricValue -Metrics $source -Name 'total_tokens'
+    tool_calls = Get-MetricValue -Metrics $source -Name 'tool_calls'
+    agent_count = Get-MetricValue -Metrics $source -Name 'agent_count'
+    duration_seconds = Get-MetricValue -Metrics $source -Name 'duration_seconds'
+  }
+}
+
+function Get-V02Outcome {
+  param([object]$Metrics)
+
+  $source = if ($null -ne $Metrics.PSObject.Properties['outcome']) {
+    $Metrics.outcome
+  }
+  else {
+    $Metrics
+  }
+  return [ordered]@{
+    verification = Get-MetricValue -Metrics $source -Name 'verification'
+    stop = Get-MetricValue -Metrics $source -Name 'stop'
+    provider_status = Get-MetricValue -Metrics $source -Name 'provider_status'
+    model_completion_status = Get-MetricValue -Metrics $source -Name 'model_completion_status'
+    task_success = Get-MetricValue -Metrics $source -Name 'task_success'
+    scope_violation = Get-MetricValue -Metrics $source -Name 'scope_violation'
+    evaluator_validity = Get-MetricValue -Metrics $source -Name 'evaluator_validity'
+    changed_files = Get-MetricValue -Metrics $source -Name 'changed_files'
+    tests_weakened = Get-MetricValue -Metrics $source -Name 'tests_weakened'
+    dependencies_changed = Get-MetricValue -Metrics $source -Name 'dependencies_changed'
+    failure_class = Get-MetricValue -Metrics $source -Name 'failure_class'
+  }
+}
+
+function Update-V02TelemetryFromMetrics {
+  param(
+    [string]$TelemetryPath,
+    [string]$MetricsPath,
+    [object]$CandidateBinding,
+    [bool]$SourceDirty
+  )
+
+  $telemetry = Get-Content -Raw -LiteralPath $TelemetryPath | ConvertFrom-Json -Depth 80
+  $null = Assert-ReasonKitTelemetryRecord -Document $telemetry
+  Assert-V02TelemetryBinding -Telemetry $telemetry -CandidateBinding $CandidateBinding
+  $metrics = Get-Content -Raw -LiteralPath $MetricsPath | ConvertFrom-Json -Depth 80
+  $integrity = [ordered]@{
+    source_dirty = $SourceDirty
+    raw_packet_sha256 = $null
+    telemetry_sha256 = $null
+    historical_materials_unchanged = $null
+    integrity_status = 'UNVERIFIED'
+  }
+  return Update-ReasonKitTelemetryRecord `
+    -Document $telemetry `
+    -Outcome (Get-V02Outcome -Metrics $metrics) `
+    -ProviderMeasurements (Get-V02ProviderMeasurements -Metrics $metrics) `
+    -Integrity $integrity
 }
 
 function Get-DirectorySha256 {
@@ -179,10 +431,74 @@ function Write-JsonFile {
   [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 10), $utf8NoBom)
 }
 
+function New-V02ContextPlan {
+  param(
+    [object]$CaseItem,
+    [object]$ArmItem,
+    [object]$Instruction,
+    [object]$CandidateBinding
+  )
+
+  return [ordered]@{
+    schema_version = '0.2'
+    plan_type = 'context-plan'
+    task_id = $CaseItem.id
+    arm_id = $ArmItem.id
+    instruction_sha256 = $Instruction.Sha256
+    instruction_bytes = [int64]$Instruction.Bytes
+    kernel_sha256 = $CandidateBinding.kernel_sha256
+    module_manifest_sha256 = $CandidateBinding.module_manifest_sha256
+    route = $null
+    selected_complexity = $null
+    modules_loaded = @()
+    status = 'PENDING_HOST_EVIDENCE'
+  }
+}
+
+function Read-RecoveryReference {
+  param([string]$Reference)
+
+  if ([string]::IsNullOrWhiteSpace($Reference)) {
+    return $null
+  }
+
+  $candidatePaths = [System.Collections.Generic.List[string]]::new()
+  if ([IO.Path]::IsPathRooted($Reference)) {
+    $null = $candidatePaths.Add($Reference)
+  }
+  else {
+    $null = $candidatePaths.Add((Join-Path $root $Reference))
+    $null = $candidatePaths.Add((Join-Path (Join-Path $root $OutputRoot) $Reference))
+  }
+
+  $packetPath = $null
+  foreach ($candidatePath in @($candidatePaths)) {
+    if ((Test-Path -LiteralPath $candidatePath -PathType Container) -and
+        (Test-Path -LiteralPath (Join-Path $candidatePath 'run.json') -PathType Leaf)) {
+      $packetPath = (Resolve-Path -LiteralPath $candidatePath).Path
+      break
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($packetPath)) {
+    throw ('Recovery packet is missing: ' + $Reference)
+  }
+
+  $metadata = Get-Content -Raw -LiteralPath (Join-Path $packetPath 'run.json') | ConvertFrom-Json -Depth 80
+  if ([string]::IsNullOrWhiteSpace([string]$metadata.run_id)) {
+    throw ('Recovery packet has no run_id: ' + $Reference)
+  }
+  return [pscustomobject][ordered]@{
+    path = $packetPath
+    run_id = [string]$metadata.run_id
+  }
+}
+
 function New-BenchmarkPacket {
   param(
     [object]$CaseItem,
-    [object]$ArmItem
+    [object]$ArmItem,
+    [object]$CandidateBinding,
+    [object]$RecoveryReference
   )
 
   $timestamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
@@ -225,6 +541,24 @@ function New-BenchmarkPacket {
       $metrics[$metric] = $null
     }
   }
+  if ($Profile -eq 'v0.2') {
+    $metrics['provider_status'] = $null
+    $metrics['model_completion_status'] = $null
+    $metrics['scope_violation'] = $null
+    $metrics['evaluator_validity'] = 'UNKNOWN'
+    $metrics['changed_files'] = @()
+    $metrics['tests_weakened'] = $null
+    $metrics['dependencies_changed'] = $null
+    $metrics['failure_class'] = $null
+    $metrics['verification'] = [ordered]@{
+      result = 'NOT_RUN'
+      evidence = @()
+    }
+    $metrics['stop'] = [ordered]@{
+      decision = 'CONTINUE'
+      reason = 'Awaiting host and evaluator evidence.'
+    }
+  }
 
   $metadata = [ordered]@{
     schema_version = '0.2'
@@ -251,9 +585,57 @@ function New-BenchmarkPacket {
     raw_output_file = $null
     metrics_file = (Join-Path $relativeOutput 'metrics.json').Replace('\', '/')
   }
+  $telemetryPath = $null
+  if ($Profile -eq 'v0.2') {
+    $telemetryPath = Join-Path $runPath 'telemetry.json'
+    $metadata['profile'] = 'v0.2'
+    $metadata['candidate_id'] = $CandidateBinding.candidate_id
+    $metadata['candidate_version'] = $CandidateBinding.candidate_version
+    $metadata['candidate_manifest_sha256'] = $CandidateBinding.candidate_manifest_sha256
+    $metadata['kernel_sha256'] = $CandidateBinding.kernel_sha256
+    $metadata['module_manifest_sha256'] = $CandidateBinding.module_manifest_sha256
+    $metadata['runner_sha256'] = $CandidateBinding.runner_sha256
+    $metadata['adapter_sha256'] = $CandidateBinding.adapter_sha256
+    $metadata['telemetry_schema_version'] = '0.2'
+    $metadata['telemetry_file'] = (Join-Path $relativeOutput 'telemetry.json').Replace('\', '/')
+    $metadata['recovery_of'] = if ($null -eq $RecoveryReference) { $null } else { $RecoveryReference.run_id }
+    $metadata['context_plan_file'] = (Join-Path $relativeOutput 'context-plan.json').Replace('\', '/')
+    $contextPlanPath = Join-Path $runPath 'context-plan.json'
+    $contextPlan = New-V02ContextPlan `
+      -CaseItem $CaseItem `
+      -ArmItem $ArmItem `
+      -Instruction $instruction `
+      -CandidateBinding $CandidateBinding
+    Write-JsonFile -Path $contextPlanPath -Value $contextPlan
+  }
 
   Write-JsonFile -Path (Join-Path $runPath 'run.json') -Value $metadata
   Write-JsonFile -Path (Join-Path $runPath 'metrics.json') -Value $metrics
+  if ($Profile -eq 'v0.2') {
+    $taskHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $promptPath).Hash.ToLowerInvariant()
+    $telemetry = New-ReasonKitTelemetryRecord `
+      -RunId $runId `
+      -TaskId $CaseItem.id `
+      -Arm $ArmItem.id `
+      -CandidateManifest $CandidateBinding.manifest `
+      -SourceCommit $sourceCommit `
+      -TaskHash $taskHash `
+      -FixtureHash $fixtureSha256 `
+      -KernelId 'core.tiny-kernel' `
+      -KernelSha256 $CandidateBinding.kernel_sha256 `
+      -ModuleManifestSha256 $CandidateBinding.module_manifest_sha256 `
+      -RunnerSha256 $CandidateBinding.runner_sha256 `
+      -AdapterSha256 $CandidateBinding.adapter_sha256 `
+      -Context ([ordered]@{ instruction_bytes = $instruction.Bytes }) `
+      -Integrity ([ordered]@{
+        source_dirty = $sourceDirty
+        raw_packet_sha256 = $null
+        telemetry_sha256 = $null
+        historical_materials_unchanged = $null
+        integrity_status = 'UNVERIFIED'
+      })
+    Write-JsonFile -Path $telemetryPath -Value $telemetry
+  }
 
   if ([string]::IsNullOrWhiteSpace($Command)) {
     $global:LASTEXITCODE = 0
@@ -284,6 +666,12 @@ function New-BenchmarkPacket {
     })
     'REASONKIT_OUTPUT_FILE' = $rawOutputPath
     'REASONKIT_METRICS_FILE' = (Join-Path $runPath 'metrics.json')
+  }
+  if ($Profile -eq 'v0.2') {
+    $environment['REASONKIT_PROFILE'] = 'v0.2'
+    $environment['REASONKIT_TELEMETRY_FILE'] = $telemetryPath
+    $environment['REASONKIT_CONTEXT_PLAN_FILE'] = $contextPlanPath
+    $environment['REASONKIT_RECOVERY_OF'] = if ($null -eq $RecoveryReference) { '' } else { $RecoveryReference.run_id }
   }
 
   foreach ($name in $environment.Keys) {
@@ -326,15 +714,51 @@ function New-BenchmarkPacket {
     }
   }
 
+  if ($Profile -eq 'v0.2') {
+    try {
+      $updatedTelemetry = Update-V02TelemetryFromMetrics `
+        -TelemetryPath $telemetryPath `
+        -MetricsPath (Join-Path $runPath 'metrics.json') `
+        -CandidateBinding $CandidateBinding `
+        -SourceDirty $sourceDirty
+      Write-JsonFile -Path $telemetryPath -Value $updatedTelemetry
+    }
+    catch {
+      $metadata.status = 'failed'
+      $metadata.telemetry_error = $_.Exception.Message
+      Write-JsonFile -Path (Join-Path $runPath 'run.json') -Value $metadata
+      throw
+    }
+  }
+
   Write-JsonFile -Path (Join-Path $runPath 'run.json') -Value $metadata
   $global:LASTEXITCODE = 0
   Write-Output ('ran ' + $relativeOutput + ' (exit=' + $exitCode + ')')
 }
 
+if ($Profile -eq 'v0.2') {
+  $candidateBinding = Read-V02CandidateBinding
+}
+
+$recoveryReference = $null
+if (-not [string]::IsNullOrWhiteSpace($RecoveryOf)) {
+  if ($Profile -ne 'v0.2') {
+    throw 'Recovery linkage requires -Profile v0.2.'
+  }
+  if ($PrepareAll) {
+    throw 'Recovery linkage requires one selected case and arm, not -PrepareAll.'
+  }
+  $recoveryReference = Read-RecoveryReference -Reference $RecoveryOf
+}
+
 if ($PrepareAll) {
   foreach ($caseItem in $manifest.cases) {
     foreach ($armItem in $manifest.arms) {
-      New-BenchmarkPacket -CaseItem $caseItem -ArmItem $armItem
+      New-BenchmarkPacket `
+        -CaseItem $caseItem `
+        -ArmItem $armItem `
+        -CandidateBinding $candidateBinding `
+        -RecoveryReference $recoveryReference
     }
   }
   $global:LASTEXITCODE = 0
@@ -347,4 +771,8 @@ if ([string]::IsNullOrWhiteSpace($Case) -or [string]::IsNullOrWhiteSpace($Arm)) 
 
 $selectedCase = Get-ManifestItem -Items $manifest.cases -Id $Case -Kind 'case'
 $selectedArm = Get-ManifestItem -Items $manifest.arms -Id $Arm -Kind 'arm'
-New-BenchmarkPacket -CaseItem $selectedCase -ArmItem $selectedArm
+New-BenchmarkPacket `
+  -CaseItem $selectedCase `
+  -ArmItem $selectedArm `
+  -CandidateBinding $candidateBinding `
+  -RecoveryReference $recoveryReference

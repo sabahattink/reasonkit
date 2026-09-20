@@ -20,7 +20,7 @@ $script:KernelTokensMax = 2000
 $script:RegistryPath = 'core/module-registry.json'
 $script:RegistrySourceBytesMax = 2000
 $script:RegistryTokensMax = 500
-$script:Phase1MutableV01Seams = @('scripts/build-dist.ps1')
+$script:Phase1MutableV01Seams = @('scripts/build-dist.ps1', 'scripts/run-benchmark.ps1')
 
 $script:FrozenV01Hashes = [ordered]@{
         '.editorconfig' = 'ea3d46f76380a5f059c4b1387e528ae6690c9444a077f4004775a9278ace0d01'
@@ -1871,6 +1871,399 @@ try {
       $startedLifecycle.provider_measurements.output_tokens -ne $null -or
       $startedLifecycle.started -ne $true) {
     throw 'Specialist start seam fabricated provider usage or failed to record the external start.'
+  }
+
+  $phase4TempRoot = Join-Path ([IO.Path]::GetTempPath()) ('reasonkit-v02-phase4-' + [Guid]::NewGuid().ToString('N'))
+  $phase4CandidatePath = Join-Path $phase4TempRoot 'candidate-manifest.json'
+  $phase4OutputRelative = 'phase4-test-runs-' + [Guid]::NewGuid().ToString('N')
+  $phase4OutputAbsolute = Join-Path $script:PhaseRoot $phase4OutputRelative
+  $phase4RepeatOutputRelative = 'phase4-repeat-runs-' + [Guid]::NewGuid().ToString('N')
+  $phase4RepeatOutputAbsolute = Join-Path $script:PhaseRoot $phase4RepeatOutputRelative
+  New-Item -ItemType Directory -Force -Path $phase4TempRoot | Out-Null
+  try {
+    $phase4SourceCommit = Invoke-GitText -Arguments @('rev-parse', 'HEAD')
+    $phase4Candidate = New-ReasonKitCandidateManifest `
+      -CandidateId 'rk2-synthetic-phase4' `
+      -CandidateVersion '0.2.0-synthetic' `
+      -SourceCommit $phase4SourceCommit `
+      -RepositoryRoot $script:PhaseRoot
+    $phase4CanonicalA = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $phase4Candidate
+    $phase4CanonicalB = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $phase4Candidate
+    $phase4DigestCanonicalA = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $phase4Candidate -ForDigest
+    $phase4DigestCanonicalB = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $phase4Candidate -ForDigest
+    $phase4DigestHashA = Get-ReasonKitCandidateManifestHash -Manifest $phase4Candidate
+    $phase4DigestHashB = Get-ReasonKitCandidateManifestHash -Manifest $phase4Candidate
+    if ($phase4CanonicalA -cne $phase4CanonicalB -or
+        $phase4DigestCanonicalA -cne $phase4DigestCanonicalB -or
+        $phase4DigestCanonicalA -match 'candidate_manifest_sha256' -or
+        $phase4DigestHashA -cne $phase4DigestHashB -or
+        $phase4DigestHashA -cne $phase4Candidate.candidate_manifest_sha256 -or
+        $phase4Candidate.candidate_manifest_sha256 -match '^0{64}$') {
+      throw 'Phase 4 candidate canonicalization is not deterministic.'
+    }
+    $phase4Utf8 = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText($phase4CandidatePath, $phase4CanonicalA, $phase4Utf8)
+    $null = Assert-ReasonKitCandidateManifest `
+      -Manifest $phase4Candidate `
+      -RepositoryRoot $script:PhaseRoot `
+      -ExpectedSourceCommit $phase4SourceCommit `
+      -SchemaPath (Join-Path $script:PhaseRoot 'core/candidate-manifest.schema.json') `
+      -ManifestText $phase4CanonicalA
+
+    Assert-Throws -Name 'candidate digest field mutation' -Script {
+      $tamperedDigest = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $tamperedDigest.candidate_manifest_sha256 = if ($phase4Candidate.candidate_manifest_sha256 -eq ('a' * 64)) { ('b' * 64) } else { ('a' * 64) }
+      Assert-ReasonKitCandidateManifest -Manifest $tamperedDigest -RepositoryRoot $script:PhaseRoot
+    }
+
+    $phase4MutationRepo = Join-Path $phase4TempRoot 'mutation-repo'
+    New-Item -ItemType Directory -Force -Path $phase4MutationRepo | Out-Null
+    foreach ($requiredPath in @(
+        'core/tiny-kernel.md',
+        'core/module-registry.json',
+        'core/specialist-gate.md',
+        'core/telemetry.schema.json',
+        'core/candidate-manifest.schema.json',
+        'scripts/reasonkit-v02.psm1',
+        'scripts/run-benchmark.ps1'
+    )) {
+      $sourcePath = Join-Path $script:PhaseRoot ($requiredPath -replace '/', '\')
+      $destinationPath = Join-Path $phase4MutationRepo ($requiredPath -replace '/', '\')
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
+      Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+    }
+    $mutationRegistry = Get-Content -Raw -LiteralPath (Join-Path $phase4MutationRepo 'core/module-registry.json') | ConvertFrom-Json -Depth 20
+    foreach ($mutationModule in @($mutationRegistry.modules)) {
+      $moduleRelativePath = [string]$mutationModule.source_path
+      $sourcePath = Join-Path $script:PhaseRoot ($moduleRelativePath -replace '/', '\')
+      $destinationPath = Join-Path $phase4MutationRepo ($moduleRelativePath -replace '/', '\')
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
+      Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+    }
+    $mutationDistRoot = Join-Path $phase4MutationRepo 'dist/v0.2'
+    New-Item -ItemType Directory -Force -Path $mutationDistRoot | Out-Null
+    Copy-Item -Path (Join-Path $script:PhaseRoot 'dist/v0.2/*') -Destination $mutationDistRoot -Recurse -Force
+    $mutationKernelPath = Join-Path $phase4MutationRepo 'core/tiny-kernel.md'
+    $mutationKernelBytes = [IO.File]::ReadAllBytes($mutationKernelPath)
+    if ($mutationKernelBytes.Length -eq 0) {
+      throw 'Mutation fixture kernel is unexpectedly empty.'
+    }
+    $mutationKernelBytes[0] = if ($mutationKernelBytes[0] -eq 0x23) { [byte]0x2D } else { [byte]0x23 }
+    [IO.File]::WriteAllBytes($mutationKernelPath, $mutationKernelBytes)
+    $phase4MutatedCandidate = New-ReasonKitCandidateManifest `
+      -CandidateId 'rk2-synthetic-phase4' `
+      -CandidateVersion '0.2.0-synthetic' `
+      -SourceCommit $phase4SourceCommit `
+      -RepositoryRoot $phase4MutationRepo
+    if ($phase4MutatedCandidate.candidate_manifest_sha256 -eq
+        $phase4Candidate.candidate_manifest_sha256) {
+      throw 'One-byte covered-file mutation did not change the candidate digest.'
+    }
+    Assert-Throws -Name 'candidate unresolved source commit' -Script {
+      $badSource = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $badSource.source_commit = ('0' * 40)
+      $badSource.candidate_manifest_sha256 = Get-ReasonKitCandidateManifestHash -Manifest $badSource
+      Assert-ReasonKitCandidateManifest -Manifest $badSource -RepositoryRoot $script:PhaseRoot
+    }
+    Assert-Throws -Name 'candidate duplicate path' -Script {
+      $duplicate = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $duplicate.covered_files = @($duplicate.covered_files + $duplicate.covered_files[0])
+      Assert-ReasonKitCandidateManifest -Manifest $duplicate -RepositoryRoot $script:PhaseRoot
+    }
+    Assert-Throws -Name 'candidate missing file' -Script {
+      $missing = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $missing.covered_files = @($missing.covered_files | Where-Object { $_.repository_relative_path -ne 'core/tiny-kernel.md' })
+      Assert-ReasonKitCandidateManifest -Manifest $missing -RepositoryRoot $script:PhaseRoot
+    }
+    Assert-Throws -Name 'candidate declared SHA mismatch' -Script {
+      $badSha = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $badSha.covered_files[0].sha256 = ('b' * 64)
+      Assert-ReasonKitCandidateManifest -Manifest $badSha -RepositoryRoot $script:PhaseRoot
+    }
+    Assert-Throws -Name 'candidate source commit mismatch' -Script {
+      Assert-ReasonKitCandidateManifest -Manifest $phase4Candidate -RepositoryRoot $script:PhaseRoot -ExpectedSourceCommit (('0' * 40) -join '')
+    }
+    Assert-Throws -Name 'candidate kernel hash mismatch' -Script {
+      $badKernel = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $badKernel.kernel_sha256 = ('c' * 64)
+      Assert-ReasonKitCandidateManifest -Manifest $badKernel -RepositoryRoot $script:PhaseRoot
+    }
+    Assert-Throws -Name 'candidate registry hash mismatch' -Script {
+      $badRegistry = ($phase4Candidate | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+      $badRegistry.module_manifest_sha256 = ('d' * 64)
+      Assert-ReasonKitCandidateManifest -Manifest $badRegistry -RepositoryRoot $script:PhaseRoot
+    }
+
+    $phase4Telemetry = New-ReasonKitTelemetryRecord `
+      -RunId 'synthetic-phase4-run' `
+      -TaskId 'synthetic' `
+      -Arm 'C' `
+      -CandidateManifest $phase4Candidate `
+      -SourceCommit $phase4SourceCommit `
+      -Context $firstPlan.telemetry `
+      -Specialists $phase3Conflict.telemetry
+    if ($null -ne $phase4Telemetry.provider_measurements.total_tokens -or
+        ($phase4Telemetry.context | ConvertTo-Json -Depth 50) -match 'candidate_id') {
+      throw 'Candidate binding leaked into context or fabricated total_tokens.'
+    }
+    $phase4Telemetry = Update-ReasonKitTelemetryRecord `
+      -Document $phase4Telemetry `
+      -ProviderMeasurements ([ordered]@{
+        input_tokens = 10
+        cached_input_tokens = 8
+        output_tokens = 2
+        reasoning_tokens = $null
+        total_tokens = $null
+        tool_calls = 1
+        agent_count = $null
+        duration_seconds = $null
+      })
+    if ($phase4Telemetry.provider_measurements.total_tokens -ne $null -or
+        $phase4Telemetry.provider_measurements.input_tokens -ne 10) {
+      throw 'Provider measurements were recomputed or not preserved as nullable fields.'
+    }
+    foreach ($moduleRecord in @($phase4Telemetry.context.modules_loaded)) {
+      if ($null -ne $moduleRecord.PSObject.Properties['provider_cache']) {
+        throw 'Provider cache was conflated with loader reuse telemetry.'
+      }
+    }
+    $null = Assert-ReasonKitTelemetryRecord -Document $phase4Telemetry
+
+    $legacyOutput = @(& .\scripts\run-benchmark.ps1 -Case TASK-001 -Arm A -OutputRoot ('phase4-legacy-' + [Guid]::NewGuid().ToString('N')))
+    $legacyPrepared = @($legacyOutput | Where-Object { $_.ToString().StartsWith('prepared ') } | Select-Object -Last 1)
+    if ($legacyPrepared.Count -ne 1) {
+      throw 'Historical v0.1 runner compatibility preparation failed.'
+    }
+    $legacyRelative = $legacyPrepared[0].ToString().Substring('prepared '.Length)
+    $legacyPath = Join-Path $script:PhaseRoot $legacyRelative
+    if (Test-Path -LiteralPath (Join-Path $legacyPath 'telemetry.json') -PathType Leaf) {
+      throw 'Historical v0.1 runner unexpectedly emitted a v0.2 telemetry sidecar.'
+    }
+    Remove-Item -LiteralPath (Split-Path -Parent $legacyPath) -Recurse -Force -ErrorAction SilentlyContinue
+
+    $v02Output = @(& .\scripts\run-benchmark.ps1 `
+      -Profile v0.2 `
+      -Case TASK-001 `
+      -Arm A `
+      -CandidateManifestPath $phase4CandidatePath `
+      -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
+      -OutputRoot $phase4OutputRelative)
+    $v02Prepared = @($v02Output | Where-Object { $_.ToString().StartsWith('prepared ') } | Select-Object -Last 1)
+    if ($v02Prepared.Count -ne 1) {
+      throw 'v0.2 runner did not prepare one isolated packet.'
+    }
+    $v02Relative = $v02Prepared[0].ToString().Substring('prepared '.Length)
+    $v02Path = Join-Path $script:PhaseRoot $v02Relative
+    $v02Metadata = Get-Content -Raw -LiteralPath (Join-Path $v02Path 'run.json') | ConvertFrom-Json -Depth 80
+    $v02Sidecar = Get-Content -Raw -LiteralPath (Join-Path $v02Path 'telemetry.json') | ConvertFrom-Json -Depth 80
+    if ($v02Metadata.candidate_id -ne $phase4Candidate.candidate_id -or
+        $v02Metadata.candidate_manifest_sha256 -ne $phase4Candidate.candidate_manifest_sha256 -or
+        $v02Sidecar.identity.candidate_id -ne $phase4Candidate.candidate_id -or
+        $v02Sidecar.identity.candidate_manifest_sha256 -ne $phase4Candidate.candidate_manifest_sha256 -or
+        @((Get-ChildItem -LiteralPath (Join-Path $v02Path 'workspace') -Recurse -File | Where-Object { $_.Name -match 'candidate' })).Count -gt 0) {
+      throw 'v0.2 candidate provenance binding or prompt-isolation contract failed.'
+    }
+    if ($null -ne $v02Sidecar.provider_measurements.total_tokens) {
+      throw 'v0.2 prepared telemetry fabricated total_tokens.'
+    }
+
+    $v02ContextPlanPath = Join-Path $v02Path 'context-plan.json'
+    if (-not (Test-Path -LiteralPath $v02ContextPlanPath -PathType Leaf) -or
+        $v02Metadata.context_plan_file -ne ($v02Relative.Replace('\', '/') + '/context-plan.json')) {
+      throw 'v0.2 runner did not emit the deterministic context-plan sidecar before host execution.'
+    }
+    $v02ContextPlanText = [IO.File]::ReadAllText($v02ContextPlanPath)
+    if ([string]::IsNullOrWhiteSpace($v02ContextPlanText) -or
+        $v02ContextPlanText -match [regex]::Escape([string]$v02Metadata.run_id) -or
+        $v02ContextPlanText -match 'created_at_utc') {
+      throw 'v0.2 context-plan sidecar contains nondeterministic packet metadata.'
+    }
+    $v02RepeatOutput = @(& .\scripts\run-benchmark.ps1 `
+      -Profile v0.2 `
+      -Case TASK-001 `
+      -Arm A `
+      -CandidateManifestPath $phase4CandidatePath `
+      -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
+      -OutputRoot $phase4RepeatOutputRelative)
+    $v02RepeatPrepared = @($v02RepeatOutput | Where-Object { $_.ToString().StartsWith('prepared ') } | Select-Object -Last 1)
+    if ($v02RepeatPrepared.Count -ne 1) {
+      throw 'v0.2 deterministic context-plan repeat packet was not prepared.'
+    }
+    $v02RepeatRelative = $v02RepeatPrepared[0].ToString().Substring('prepared '.Length)
+    $v02RepeatPath = Join-Path $script:PhaseRoot $v02RepeatRelative
+    $v02RepeatContextPlanText = [IO.File]::ReadAllText((Join-Path $v02RepeatPath 'context-plan.json'))
+    if ($v02ContextPlanText -cne $v02RepeatContextPlanText) {
+      throw 'Identical v0.2 context-plan inputs did not produce identical sidecar bytes.'
+    }
+
+    $providerHostScript = Join-Path $phase4TempRoot 'provider-host.ps1'
+    $providerHostText = @'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$metricsPath = $env:REASONKIT_METRICS_FILE
+$metrics = Get-Content -Raw -LiteralPath $metricsPath | ConvertFrom-Json -Depth 80
+$metrics.input_tokens = 17
+$metrics.cached_input_tokens = 11
+$metrics.output_tokens = 3
+$metrics.reasoning_tokens = 4
+$metrics.total_tokens = 999
+$metrics.tool_calls = 2
+$metrics.agent_count = 0
+$metrics.duration_seconds = 1.25
+$metrics.provider_status = 'COMPLETED'
+$metrics.model_completion_status = 'COMPLETED'
+$metrics.task_success = $true
+$metrics.scope_violation = $false
+$metrics.evaluator_validity = 'NOT_APPLICABLE'
+$metrics.failure_class = $null
+$metrics.verification = [ordered]@{ result = 'PASS'; evidence = @('synthetic-provider-verification') }
+$metrics.stop = [ordered]@{ decision = 'STOP'; reason = 'Synthetic host completed.' }
+[IO.File]::WriteAllText($metricsPath, ($metrics | ConvertTo-Json -Depth 80), $utf8NoBom)
+$planPath = $env:REASONKIT_CONTEXT_PLAN_FILE
+$observation = [ordered]@{
+  context_plan_exists = Test-Path -LiteralPath $planPath -PathType Leaf
+  telemetry_exists = Test-Path -LiteralPath $env:REASONKIT_TELEMETRY_FILE -PathType Leaf
+  metrics_exists = Test-Path -LiteralPath $metricsPath -PathType Leaf
+  recovery_of = $env:REASONKIT_RECOVERY_OF
+  context_plan_text = if (Test-Path -LiteralPath $planPath -PathType Leaf) { [IO.File]::ReadAllText($planPath) } else { '' }
+}
+[IO.File]::WriteAllText((Join-Path $env:REASONKIT_WORKSPACE 'host-observation.json'), ($observation | ConvertTo-Json -Depth 20), $utf8NoBom)
+Write-Output 'completed-host-output'
+'@
+    [IO.File]::WriteAllText($providerHostScript, $providerHostText, $phase4Utf8)
+
+    $completedOutput = @(& .\scripts\run-benchmark.ps1 `
+      -Profile v0.2 `
+      -Case TASK-001 `
+      -Arm A `
+      -CandidateManifestPath $phase4CandidatePath `
+      -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
+      -OutputRoot $phase4OutputRelative `
+      -Command 'pwsh.exe' `
+      -ArgumentList @('-NoProfile', '-File', $providerHostScript))
+    $completedRan = @($completedOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
+    if ($completedRan.Count -ne 1) {
+      throw 'Provider-written metrics host did not complete one v0.2 packet.'
+    }
+    $completedRelative = $completedRan[0].ToString().Substring('ran '.Length).Split(' (exit=')[0]
+    $completedPath = Join-Path $script:PhaseRoot $completedRelative
+    $completedMetadata = Get-Content -Raw -LiteralPath (Join-Path $completedPath 'run.json') | ConvertFrom-Json -Depth 80
+    $completedTelemetry = Get-Content -Raw -LiteralPath (Join-Path $completedPath 'telemetry.json') | ConvertFrom-Json -Depth 80
+    $completedObservation = Get-Content -Raw -LiteralPath (Join-Path $completedPath 'workspace/host-observation.json') | ConvertFrom-Json -Depth 20
+    $completedRawPath = Join-Path $completedPath 'model-output.txt'
+    $completedRawText = [IO.File]::ReadAllText($completedRawPath)
+    $completedRawHashBefore = (Get-FileHash -Algorithm SHA256 -LiteralPath $completedRawPath).Hash.ToLowerInvariant()
+    if ($completedMetadata.context_plan_file -ne ($completedRelative.Replace('\', '/') + '/context-plan.json') -or
+        $completedObservation.context_plan_exists -ne $true -or
+        $completedObservation.telemetry_exists -ne $true -or
+        $completedObservation.metrics_exists -ne $true -or
+        -not [string]::IsNullOrWhiteSpace([string]$completedObservation.recovery_of) -or
+        $completedObservation.context_plan_text -cne $v02ContextPlanText -or
+        $completedRawText -cne "completed-host-output$([Environment]::NewLine)" -or
+        $completedTelemetry.provider_measurements.input_tokens -ne 17 -or
+        $completedTelemetry.provider_measurements.cached_input_tokens -ne 11 -or
+        $completedTelemetry.provider_measurements.output_tokens -ne 3 -or
+        $completedTelemetry.provider_measurements.reasoning_tokens -ne 4 -or
+        $completedTelemetry.provider_measurements.total_tokens -ne 999 -or
+        $completedTelemetry.provider_measurements.tool_calls -ne 2 -or
+        $completedTelemetry.provider_measurements.agent_count -ne 0 -or
+        $completedTelemetry.provider_measurements.duration_seconds -ne 1.25 -or
+        $completedTelemetry.outcome.provider_status -ne 'COMPLETED' -or
+        $completedTelemetry.outcome.model_completion_status -ne 'COMPLETED' -or
+        $completedTelemetry.outcome.task_success -ne $true) {
+      throw 'Runner did not preserve provider-written measurements, sidecar paths, or completed raw output.'
+    }
+    $completedRawHashAfter = (Get-FileHash -Algorithm SHA256 -LiteralPath $completedRawPath).Hash.ToLowerInvariant()
+    if ($completedRawHashBefore -cne $completedRawHashAfter) {
+      throw 'Completed raw output changed after telemetry processing.'
+    }
+
+    $abortedHostScript = Join-Path $phase4TempRoot 'provider-abort-host.ps1'
+    $abortedHostText = @'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$metricsPath = $env:REASONKIT_METRICS_FILE
+$metrics = Get-Content -Raw -LiteralPath $metricsPath | ConvertFrom-Json -Depth 80
+$metrics.provider_status = 'ABORTED'
+$metrics.model_completion_status = 'NOT_STARTED'
+$metrics.task_success = $null
+$metrics.scope_violation = $null
+$metrics.evaluator_validity = 'UNKNOWN'
+$metrics.failure_class = 'PROVIDER_ABORTED'
+$metrics.verification = [ordered]@{ result = 'NOT_RUN'; evidence = @('provider-abort') }
+$metrics.stop = [ordered]@{ decision = 'STOP'; reason = 'Provider usage limit.' }
+[IO.File]::WriteAllText($metricsPath, ($metrics | ConvertTo-Json -Depth 80), $utf8NoBom)
+Write-Output 'provider-aborted-output'
+exit 17
+'@
+    [IO.File]::WriteAllText($abortedHostScript, $abortedHostText, $phase4Utf8)
+
+    $abortedOutput = @(& .\scripts\run-benchmark.ps1 `
+      -Profile v0.2 `
+      -Case TASK-001 `
+      -Arm A `
+      -CandidateManifestPath $phase4CandidatePath `
+      -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
+      -OutputRoot $phase4OutputRelative `
+      -Command 'pwsh.exe' `
+      -ArgumentList @('-NoProfile', '-File', $abortedHostScript))
+    $abortedRan = @($abortedOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
+    if ($abortedRan.Count -ne 1) {
+      throw 'Provider-aborted host did not produce one preserved packet.'
+    }
+    $abortedRelative = $abortedRan[0].ToString().Substring('ran '.Length).Split(' (exit=')[0]
+    $abortedPath = Join-Path $script:PhaseRoot $abortedRelative
+    $abortedMetadataTextBefore = [IO.File]::ReadAllText((Join-Path $abortedPath 'run.json'))
+    $abortedMetadata = $abortedMetadataTextBefore | ConvertFrom-Json -Depth 80
+    $abortedMetricsTextBefore = [IO.File]::ReadAllText((Join-Path $abortedPath 'metrics.json'))
+    $abortedTelemetryTextBefore = [IO.File]::ReadAllText((Join-Path $abortedPath 'telemetry.json'))
+    $abortedRawPath = Join-Path $abortedPath 'model-output.txt'
+    $abortedRawTextBefore = [IO.File]::ReadAllText($abortedRawPath)
+    $abortedRawHashBefore = (Get-FileHash -Algorithm SHA256 -LiteralPath $abortedRawPath).Hash.ToLowerInvariant()
+    $abortedTelemetry = $abortedTelemetryTextBefore | ConvertFrom-Json -Depth 80
+    if ($abortedTelemetry.outcome.provider_status -ne 'ABORTED' -or
+        $abortedTelemetry.outcome.model_completion_status -ne 'NOT_STARTED' -or
+        $abortedTelemetry.outcome.failure_class -ne 'PROVIDER_ABORTED' -or
+        $abortedRawTextBefore -cne "provider-aborted-output$([Environment]::NewLine)") {
+      throw 'PROVIDER_ABORTED packet was not preserved with provider-owned outcome evidence.'
+    }
+
+    $recoveryOutput = @(& .\scripts\run-benchmark.ps1 `
+      -Profile v0.2 `
+      -Case TASK-001 `
+      -Arm A `
+      -CandidateManifestPath $phase4CandidatePath `
+      -BenchmarkManifestPath (Join-Path $script:PhaseRoot 'evals/benchmark.json') `
+      -OutputRoot $phase4OutputRelative `
+      -RecoveryOf $abortedMetadata.run_id `
+      -Command 'pwsh.exe' `
+      -ArgumentList @('-NoProfile', '-File', $providerHostScript))
+    $recoveryRan = @($recoveryOutput | Where-Object { $_.ToString().StartsWith('ran ') } | Select-Object -Last 1)
+    if ($recoveryRan.Count -ne 1) {
+      throw 'Provider recovery host did not produce one new packet.'
+    }
+    $recoveryRelative = $recoveryRan[0].ToString().Substring('ran '.Length).Split(' (exit=')[0]
+    $recoveryPath = Join-Path $script:PhaseRoot $recoveryRelative
+    $recoveryMetadata = Get-Content -Raw -LiteralPath (Join-Path $recoveryPath 'run.json') | ConvertFrom-Json -Depth 80
+    $recoveryObservation = Get-Content -Raw -LiteralPath (Join-Path $recoveryPath 'workspace/host-observation.json') | ConvertFrom-Json -Depth 20
+    if ($recoveryMetadata.run_id -eq $abortedMetadata.run_id -or
+        $recoveryMetadata.recovery_of -ne $abortedMetadata.run_id -or
+        $recoveryObservation.recovery_of -ne $abortedMetadata.run_id -or
+        -not (Test-Path -LiteralPath $abortedPath -PathType Container) -or
+        -not (Test-Path -LiteralPath $abortedRawPath -PathType Leaf) -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $abortedRawPath).Hash.ToLowerInvariant() -cne $abortedRawHashBefore -or
+        [IO.File]::ReadAllText((Join-Path $abortedPath 'run.json')) -cne $abortedMetadataTextBefore -or
+        [IO.File]::ReadAllText((Join-Path $abortedPath 'metrics.json')) -cne $abortedMetricsTextBefore -or
+        [IO.File]::ReadAllText((Join-Path $abortedPath 'telemetry.json')) -cne $abortedTelemetryTextBefore) {
+      throw 'Recovery replaced, rewrote, or deleted the original PROVIDER_ABORTED packet.'
+    }
+
+    Write-Output 'phase4_candidate_manifest_tests=PASS'
+    Write-Output 'phase4_telemetry_binding_tests=PASS'
+    Write-Output 'phase4_runner_compatibility_tests=PASS'
+  }
+  finally {
+    Remove-Item -LiteralPath $phase4TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $phase4OutputAbsolute -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $phase4RepeatOutputAbsolute -Recurse -Force -ErrorAction SilentlyContinue
   }
 
   Write-Output 'rk2_03_no_spawn_tests=PASS'

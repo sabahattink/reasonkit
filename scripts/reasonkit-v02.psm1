@@ -48,6 +48,22 @@ function Get-RkItems {
   return @($value)
 }
 
+function Get-RkArrayValue {
+  param(
+    [object]$Object,
+    [string]$Name
+  )
+
+  $items = [System.Collections.Generic.List[object]]::new()
+  $value = Get-RkProperty -Object $Object -Name $Name
+  foreach ($item in @($value)) {
+    if ($null -ne $item) {
+      $null = $items.Add($item)
+    }
+  }
+  return ,$items.ToArray()
+}
+
 function Normalize-RkPath {
   param([string]$Path)
 
@@ -1375,11 +1391,675 @@ function Resolve-ReasonKitContext {
    }
 }
 
+function New-RkCandidateFileRecord {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRelativePath,
+    [Parameter(Mandatory = $true)]
+    [string]$Role,
+    [Parameter(Mandatory = $false)]
+    [string]$ModuleId
+  )
+
+  $resolved = Resolve-RkRepositoryPath `
+    -RepositoryRoot $RepositoryRoot `
+    -RepositoryRelativePath $RepositoryRelativePath
+  if (-not (Test-Path -LiteralPath $resolved.absolute_path -PathType Leaf)) {
+    throw ('Candidate covered file is missing: ' + $resolved.relative_path)
+  }
+  $bytes = [IO.File]::ReadAllBytes($resolved.absolute_path)
+  return [ordered]@{
+    repository_relative_path = $resolved.relative_path
+    sha256 = Get-RkBytesSha256 -Bytes $bytes
+    bytes = [int64]$bytes.Length
+    role = $Role
+    module_id = if ([string]::IsNullOrWhiteSpace($ModuleId)) { $null } else { $ModuleId }
+  }
+}
+
+function Add-RkCandidateFileRecord {
+  param(
+    [Parameter(Mandatory = $true)]
+    [AllowEmptyCollection()]
+    [System.Collections.Generic.List[object]]$Records,
+    [Parameter(Mandatory = $true)]
+    [hashtable]$Seen,
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRoot,
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRelativePath,
+    [Parameter(Mandatory = $true)]
+    [string]$Role,
+    [Parameter(Mandatory = $false)]
+    [string]$ModuleId
+  )
+
+  $canonicalPath = Normalize-RkPath -Path $RepositoryRelativePath
+  if ($Seen.ContainsKey($canonicalPath)) {
+    throw ('Duplicate candidate covered path: ' + $canonicalPath)
+  }
+  $Seen[$canonicalPath] = $true
+  $null = $Records.Add((New-RkCandidateFileRecord `
+    -RepositoryRoot $RepositoryRoot `
+    -RepositoryRelativePath $canonicalPath `
+    -Role $Role `
+    -ModuleId $ModuleId))
+}
+
+function Get-RkCandidateCoverage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRoot,
+    [Parameter(Mandatory = $false)]
+    [string]$RegistryPath,
+    [Parameter(Mandatory = $false)]
+    [string[]]$AdapterPaths = @()
+  )
+
+  if ([string]::IsNullOrWhiteSpace($RegistryPath)) {
+    $RegistryPath = Join-Path $RepositoryRoot 'core/module-registry.json'
+  }
+  $registry = Read-ReasonKitModuleRegistry -Path $RegistryPath
+  $records = [System.Collections.Generic.List[object]]::new()
+  $seen = @{}
+
+  Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+    -RepositoryRelativePath 'core/tiny-kernel.md' -Role 'kernel'
+  Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+    -RepositoryRelativePath 'core/module-registry.json' -Role 'module_registry'
+
+  foreach ($module in @(Get-RkProperty -Object $registry -Name 'modules')) {
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath ([string](Get-RkProperty -Object $module -Name 'source_path')) `
+      -Role 'loadable_module' `
+      -ModuleId ([string](Get-RkProperty -Object $module -Name 'module_id'))
+  }
+
+  foreach ($entry in @(
+    [pscustomobject]@{ path = 'core/specialist-gate.md'; role = 'specialist_gate' }
+    [pscustomobject]@{ path = 'core/telemetry.schema.json'; role = 'telemetry_schema' }
+    [pscustomobject]@{ path = 'core/candidate-manifest.schema.json'; role = 'candidate_schema' }
+    [pscustomobject]@{ path = 'scripts/reasonkit-v02.psm1'; role = 'implementation_module' }
+    [pscustomobject]@{ path = 'scripts/run-benchmark.ps1'; role = 'runner' }
+  )) {
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $entry.path -Role $entry.role
+  }
+
+  $generatedRoot = Join-Path $RepositoryRoot 'dist/v0.2'
+  if (-not (Test-Path -LiteralPath $generatedRoot -PathType Container)) {
+    throw 'Candidate generated-artifact directory is missing: dist/v0.2'
+  }
+  $generatedFiles = @(Get-ChildItem -LiteralPath $generatedRoot -Recurse -File | Sort-Object FullName)
+  if ($generatedFiles.Count -eq 0) {
+    throw 'Candidate coverage requires at least one generated v0.2 artifact.'
+  }
+  foreach ($file in $generatedFiles) {
+    $relative = [IO.Path]::GetRelativePath($RepositoryRoot, $file.FullName).Replace('\', '/')
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $relative -Role 'generated_artifact'
+  }
+
+  foreach ($adapterPath in @($AdapterPaths)) {
+    if ([string]::IsNullOrWhiteSpace($adapterPath)) {
+      continue
+    }
+    Add-RkCandidateFileRecord -Records $records -Seen $seen -RepositoryRoot $RepositoryRoot `
+      -RepositoryRelativePath $adapterPath -Role 'adapter'
+  }
+
+  return @($records.ToArray() | Sort-Object { $_['repository_relative_path'] })
+}
+
+function ConvertTo-RkCandidateManifestPayload {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Manifest,
+    [Parameter(Mandatory = $false)]
+    [bool]$ForDigest = $false
+  )
+
+  $coveredFiles = @(
+    Get-RkItems -Object $Manifest -Name 'covered_files' |
+      ForEach-Object {
+        [ordered]@{
+          repository_relative_path = Normalize-RkPath -Path ([string](Get-RkProperty -Object $_ -Name 'repository_relative_path'))
+          sha256 = ([string](Get-RkProperty -Object $_ -Name 'sha256')).ToLowerInvariant()
+          bytes = [int64](Get-RkProperty -Object $_ -Name 'bytes')
+          role = [string](Get-RkProperty -Object $_ -Name 'role')
+          module_id = Get-RkProperty -Object $_ -Name 'module_id'
+        }
+      } |
+      Sort-Object { $_['repository_relative_path'] }
+  )
+
+  $payload = [ordered]@{
+    candidate_id = [string](Get-RkProperty -Object $Manifest -Name 'candidate_id')
+    candidate_version = [string](Get-RkProperty -Object $Manifest -Name 'candidate_version')
+    source_commit = ([string](Get-RkProperty -Object $Manifest -Name 'source_commit')).ToLowerInvariant()
+  }
+  if (-not $ForDigest) {
+    $payload['candidate_manifest_sha256'] = ([string](Get-RkProperty -Object $Manifest -Name 'candidate_manifest_sha256')).ToLowerInvariant()
+  }
+  $payload['kernel_sha256'] = ([string](Get-RkProperty -Object $Manifest -Name 'kernel_sha256')).ToLowerInvariant()
+  $payload['module_manifest_sha256'] = ([string](Get-RkProperty -Object $Manifest -Name 'module_manifest_sha256')).ToLowerInvariant()
+  $payload['covered_files'] = @($coveredFiles)
+  return $payload
+}
+
+function ConvertTo-ReasonKitCanonicalCandidateManifestJson {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Manifest,
+    [Parameter(Mandatory = $false)]
+    [switch]$ForDigest
+  )
+
+  $payload = ConvertTo-RkCandidateManifestPayload -Manifest $Manifest -ForDigest $ForDigest.IsPresent
+  return (($payload | ConvertTo-Json -Compress -Depth 50) + [string][char]10)
+}
+
+function Get-ReasonKitCandidateManifestHash {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Manifest
+  )
+
+  $canonical = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $Manifest -ForDigest
+  return Get-RkBytesSha256 -Bytes $script:Utf8NoBom.GetBytes($canonical)
+}
+
+function New-ReasonKitCandidateManifest {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$CandidateId,
+    [Parameter(Mandatory = $true)]
+    [string]$CandidateVersion,
+    [Parameter(Mandatory = $true)]
+    [string]$SourceCommit,
+    [Parameter(Mandatory = $false)]
+    [string]$RepositoryRoot = $script:ReasonKitRoot,
+    [Parameter(Mandatory = $false)]
+    [string[]]$AdapterPaths = @()
+  )
+
+  if ($CandidateId -notmatch '^rk2-[a-z0-9][a-z0-9.-]*$') {
+    throw 'Candidate ID is not canonical.'
+  }
+  if ([string]::IsNullOrWhiteSpace($CandidateVersion)) {
+    throw 'Candidate version is empty.'
+  }
+  if ($SourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'Candidate source commit is not a 40-character Git SHA.'
+  }
+
+  $coveredFiles = @(Get-RkCandidateCoverage -RepositoryRoot $RepositoryRoot -AdapterPaths $AdapterPaths)
+  $kernelRecord = @($coveredFiles | Where-Object { $_.repository_relative_path -eq 'core/tiny-kernel.md' }) | Select-Object -First 1
+  $registryRecord = @($coveredFiles | Where-Object { $_.repository_relative_path -eq 'core/module-registry.json' }) | Select-Object -First 1
+  if ($null -eq $kernelRecord -or $null -eq $registryRecord) {
+    throw 'Candidate coverage is missing the kernel or module registry.'
+  }
+
+  $manifest = [pscustomobject][ordered]@{
+    candidate_id = $CandidateId
+    candidate_version = $CandidateVersion
+    source_commit = $SourceCommit.ToLowerInvariant()
+    candidate_manifest_sha256 = $null
+    kernel_sha256 = $kernelRecord.sha256
+    module_manifest_sha256 = $registryRecord.sha256
+    covered_files = @($coveredFiles)
+  }
+  $manifest.candidate_manifest_sha256 = Get-ReasonKitCandidateManifestHash -Manifest $manifest
+  return $manifest
+}
+
+function Assert-ReasonKitCandidateManifest {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Manifest,
+    [Parameter(Mandatory = $false)]
+    [string]$RepositoryRoot = $script:ReasonKitRoot,
+    [Parameter(Mandatory = $false)]
+    [string]$ExpectedSourceCommit,
+    [Parameter(Mandatory = $false)]
+    [string]$SchemaPath,
+    [Parameter(Mandatory = $false)]
+    [string]$ManifestText
+  )
+
+  foreach ($field in @('candidate_id', 'candidate_version', 'source_commit', 'candidate_manifest_sha256', 'kernel_sha256', 'module_manifest_sha256', 'covered_files')) {
+    if ($null -eq $Manifest.PSObject.Properties[$field]) {
+      throw ('Candidate manifest field is missing: ' + $field)
+    }
+  }
+  if ([string]$Manifest.candidate_id -notmatch '^rk2-[a-z0-9][a-z0-9.-]*$') {
+    throw 'Candidate manifest candidate_id is invalid.'
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$Manifest.candidate_version)) {
+    throw 'Candidate manifest candidate_version is empty.'
+  }
+  $sourceCommit = ([string]$Manifest.source_commit).ToLowerInvariant()
+  if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'Candidate manifest source_commit is invalid.'
+  }
+  if ([string]$Manifest.source_commit -cne $sourceCommit) {
+    throw 'Candidate manifest source_commit must be lowercase.'
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedSourceCommit) -and
+      $sourceCommit -cne $ExpectedSourceCommit.ToLowerInvariant()) {
+    throw 'Candidate manifest source_commit does not match the checkout.'
+  }
+  $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+  if ($null -eq $gitCommand) {
+    throw 'Cannot resolve candidate source_commit because git is unavailable.'
+  }
+  $global:LASTEXITCODE = 0
+  $null = @(& $gitCommand.Source -C $RepositoryRoot cat-file -e ($sourceCommit + '^{commit}') 2>$null)
+  $gitExitCode = $LASTEXITCODE
+  $global:LASTEXITCODE = 0
+  if ($gitExitCode -ne 0) {
+    throw 'Candidate manifest source_commit does not resolve to a commit in the repository.'
+  }
+
+  $covered = @(Get-RkItems -Object $Manifest -Name 'covered_files')
+  if ($covered.Count -eq 0) {
+    throw 'Candidate manifest has no covered files.'
+  }
+  $seen = @{}
+  $paths = [System.Collections.Generic.List[string]]::new()
+  foreach ($entry in $covered) {
+    $declaredPath = [string](Get-RkProperty -Object $entry -Name 'repository_relative_path')
+    $path = Normalize-RkPath -Path $declaredPath
+    if ($declaredPath -cne $path) {
+      throw ('Candidate covered path is not canonical: ' + $declaredPath)
+    }
+    if ($seen.ContainsKey($path)) {
+      throw ('Duplicate candidate covered path: ' + $path)
+    }
+    $seen[$path] = $true
+    $null = $paths.Add($path)
+    $sha = ([string](Get-RkProperty -Object $entry -Name 'sha256'))
+    if ($sha -notmatch '^[0-9a-f]{64}$') {
+      throw ('Candidate covered SHA-256 must be lowercase: ' + $path)
+    }
+    $bytesValue = Get-RkProperty -Object $entry -Name 'bytes'
+    if ($null -eq $bytesValue -or [int64]$bytesValue -lt 0) {
+      throw ('Candidate covered byte count is invalid: ' + $path)
+    }
+    $role = [string](Get-RkProperty -Object $entry -Name 'role')
+    if (@('kernel', 'module_registry', 'loadable_module', 'specialist_gate', 'telemetry_schema', 'candidate_schema', 'runner', 'implementation_module', 'adapter', 'generated_artifact', 'other') -notcontains $role) {
+      throw ('Candidate covered role is invalid: ' + $path)
+    }
+    $resolved = Resolve-RkRepositoryPath -RepositoryRoot $RepositoryRoot -RepositoryRelativePath $path
+    if (-not (Test-Path -LiteralPath $resolved.absolute_path -PathType Leaf)) {
+      throw ('Candidate covered file is missing: ' + $path)
+    }
+    $actualBytes = [IO.File]::ReadAllBytes($resolved.absolute_path)
+    $actualSha = Get-RkBytesSha256 -Bytes $actualBytes
+    if ([int64]$bytesValue -ne [int64]$actualBytes.Length) {
+      throw ('Candidate covered byte count mismatch: ' + $path)
+    }
+    if ($sha -cne $actualSha) {
+      throw ('Candidate covered SHA-256 mismatch: ' + $path)
+    }
+  }
+  $sortedPaths = @($paths | Sort-Object)
+  if (($paths -join [string][char]10) -cne ($sortedPaths -join [string][char]10)) {
+    throw 'Candidate covered files are not in lexicographic path order.'
+  }
+
+  $requiredRecords = @(Get-RkCandidateCoverage -RepositoryRoot $RepositoryRoot)
+  foreach ($required in $requiredRecords) {
+    if (-not $seen.ContainsKey($required.repository_relative_path)) {
+      throw ('Candidate coverage is missing: ' + $required.repository_relative_path)
+    }
+  }
+  $kernelActual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $RepositoryRoot 'core/tiny-kernel.md')).Hash.ToLowerInvariant()
+  $registryActual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $RepositoryRoot 'core/module-registry.json')).Hash.ToLowerInvariant()
+  if ([string]$Manifest.kernel_sha256 -cne $kernelActual) {
+    throw 'Candidate kernel_sha256 does not match the current kernel.'
+  }
+  if ([string]$Manifest.module_manifest_sha256 -cne $registryActual) {
+    throw 'Candidate module_manifest_sha256 does not match the current registry.'
+  }
+  $computedManifestHash = Get-ReasonKitCandidateManifestHash -Manifest $Manifest
+  if ([string]$Manifest.candidate_manifest_sha256 -cne $computedManifestHash) {
+    throw 'Candidate manifest hash mismatch.'
+  }
+
+  $canonicalJson = ConvertTo-ReasonKitCanonicalCandidateManifestJson -Manifest $Manifest
+  if ($PSBoundParameters.ContainsKey('ManifestText') -and $ManifestText -cne $canonicalJson) {
+    throw 'Candidate manifest bytes are not canonical UTF-8 JSON with one final LF.'
+  }
+  if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
+    $SchemaPath = Join-Path $RepositoryRoot 'core/candidate-manifest.schema.json'
+  }
+  if (Test-Path -LiteralPath $SchemaPath -PathType Leaf) {
+    $schemaValid = Test-Json -Json $canonicalJson -SchemaFile $SchemaPath -ErrorAction Stop
+    if ($schemaValid -ne $true) {
+      throw 'Candidate manifest does not satisfy the frozen schema.'
+    }
+  }
+  return $Manifest
+}
+
+function ConvertTo-RkTelemetryContext {
+  param([object]$Context)
+
+  $source = $Context
+  if ($null -ne $source -and $null -ne $source.PSObject.Properties['telemetry']) {
+    $source = $source.telemetry
+  }
+  $fullBundle = Get-RkProperty -Object $source -Name 'full_bundle'
+  $omitted = Get-RkProperty -Object $source -Name 'omitted_context'
+  return [ordered]@{
+    kernel_bytes = Get-RkProperty -Object $source -Name 'kernel_bytes'
+    kernel_tokens = Get-RkProperty -Object $source -Name 'kernel_tokens'
+    loader_index_bytes = Get-RkProperty -Object $source -Name 'loader_index_bytes'
+    loader_index_tokens = Get-RkProperty -Object $source -Name 'loader_index_tokens'
+    loader_request_count = if ($null -eq (Get-RkProperty -Object $source -Name 'loader_request_count')) { 0 } else { [int](Get-RkProperty -Object $source -Name 'loader_request_count') }
+    loader_decision_duration_ms = Get-RkProperty -Object $source -Name 'loader_decision_duration_ms'
+    route = Get-RkProperty -Object $source -Name 'route'
+    selected_complexity = Get-RkProperty -Object $source -Name 'selected_complexity'
+    modules_loaded = Get-RkArrayValue -Object $source -Name 'modules_loaded'
+    omitted_context = [ordered]@{
+      source_manifest_sha256 = Get-RkProperty -Object $omitted -Name 'source_manifest_sha256'
+      module_ids = Get-RkArrayValue -Object $omitted -Name 'module_ids'
+      bytes = Get-RkProperty -Object $omitted -Name 'bytes'
+      tokens = Get-RkProperty -Object $omitted -Name 'tokens'
+      derivation = if ($null -eq (Get-RkProperty -Object $omitted -Name 'derivation')) { 'not available' } else { Get-RkProperty -Object $omitted -Name 'derivation' }
+      status = if ($null -eq (Get-RkProperty -Object $omitted -Name 'status')) { 'unavailable' } else { Get-RkProperty -Object $omitted -Name 'status' }
+    }
+    full_bundle = [ordered]@{
+      loaded = if ($null -eq (Get-RkProperty -Object $fullBundle -Name 'loaded')) { $false } else { [bool](Get-RkProperty -Object $fullBundle -Name 'loaded') }
+      escalation_reason = Get-RkProperty -Object $fullBundle -Name 'escalation_reason'
+      requested_by = Get-RkProperty -Object $fullBundle -Name 'requested_by'
+      approved_by_or_gate = Get-RkProperty -Object $fullBundle -Name 'approved_by_or_gate'
+      source_hash = Get-RkProperty -Object $fullBundle -Name 'source_hash'
+      loaded_bytes = Get-RkProperty -Object $fullBundle -Name 'loaded_bytes'
+      loaded_tokens_if_deterministic = Get-RkProperty -Object $fullBundle -Name 'loaded_tokens_if_deterministic'
+    }
+    instruction_bytes = Get-RkProperty -Object $source -Name 'instruction_bytes'
+  }
+}
+
+function ConvertTo-RkTelemetrySpecialists {
+  param([object]$Specialists)
+
+  $source = $Specialists
+  if ($null -ne $source -and $null -ne $source.PSObject.Properties['telemetry']) {
+    $source = $source.telemetry
+  }
+  $gate = Get-RkProperty -Object $source -Name 'specialist_gate'
+  return [ordered]@{
+    specialist_gate = [ordered]@{
+      considered = if ($null -eq (Get-RkProperty -Object $gate -Name 'considered')) { $false } else { [bool](Get-RkProperty -Object $gate -Name 'considered') }
+      started = if ($null -eq (Get-RkProperty -Object $gate -Name 'started')) { $false } else { [bool](Get-RkProperty -Object $gate -Name 'started') }
+      trigger = Get-RkArrayValue -Object $gate -Name 'trigger'
+      evidence_state = if ($null -eq (Get-RkProperty -Object $gate -Name 'evidence_state')) { 'not_considered' } else { Get-RkProperty -Object $gate -Name 'evidence_state' }
+      competing_hypotheses = if ($null -eq (Get-RkProperty -Object $gate -Name 'competing_hypotheses')) { 0 } else { [int](Get-RkProperty -Object $gate -Name 'competing_hypotheses') }
+      rejection_reason = Get-RkProperty -Object $gate -Name 'rejection_reason'
+      role = Get-RkProperty -Object $gate -Name 'role'
+    }
+    specialist_roles = Get-RkArrayValue -Object $source -Name 'specialist_roles'
+    specialist_count = if ($null -eq (Get-RkProperty -Object $source -Name 'specialist_count')) { 0 } else { [int](Get-RkProperty -Object $source -Name 'specialist_count') }
+    specialist_reports = Get-RkArrayValue -Object $source -Name 'specialist_reports'
+  }
+}
+
+function ConvertTo-RkTelemetryOutcome {
+  param([object]$Outcome)
+
+  $source = $Outcome
+  if ($null -ne $source -and $null -ne $source.PSObject.Properties['outcome']) {
+    $source = $source.outcome
+  }
+  $verification = Get-RkProperty -Object $source -Name 'verification'
+  $stop = Get-RkProperty -Object $source -Name 'stop'
+  return [ordered]@{
+    verification = [ordered]@{
+      result = if ($null -eq (Get-RkProperty -Object $verification -Name 'result')) { 'NOT_RUN' } else { Get-RkProperty -Object $verification -Name 'result' }
+      evidence = Get-RkArrayValue -Object $verification -Name 'evidence'
+    }
+    stop = [ordered]@{
+      decision = if ($null -eq (Get-RkProperty -Object $stop -Name 'decision')) { 'CONTINUE' } else { Get-RkProperty -Object $stop -Name 'decision' }
+      reason = if ([string]::IsNullOrWhiteSpace([string](Get-RkProperty -Object $stop -Name 'reason'))) { 'awaiting host evidence' } else { Get-RkProperty -Object $stop -Name 'reason' }
+    }
+    provider_status = if ($null -eq (Get-RkProperty -Object $source -Name 'provider_status')) { 'UNKNOWN' } else { Get-RkProperty -Object $source -Name 'provider_status' }
+    model_completion_status = if ($null -eq (Get-RkProperty -Object $source -Name 'model_completion_status')) { 'NOT_STARTED' } else { Get-RkProperty -Object $source -Name 'model_completion_status' }
+    task_success = Get-RkProperty -Object $source -Name 'task_success'
+    scope_violation = Get-RkProperty -Object $source -Name 'scope_violation'
+    evaluator_validity = if ($null -eq (Get-RkProperty -Object $source -Name 'evaluator_validity')) { 'UNKNOWN' } else { Get-RkProperty -Object $source -Name 'evaluator_validity' }
+    changed_files = Get-RkArrayValue -Object $source -Name 'changed_files'
+    tests_weakened = Get-RkProperty -Object $source -Name 'tests_weakened'
+    dependencies_changed = Get-RkProperty -Object $source -Name 'dependencies_changed'
+    failure_class = Get-RkProperty -Object $source -Name 'failure_class'
+  }
+}
+
+function ConvertTo-RkTelemetryProviderMeasurements {
+  param([object]$ProviderMeasurements)
+
+  $source = $ProviderMeasurements
+  if ($null -ne $source -and $null -ne $source.PSObject.Properties['provider_measurements']) {
+    $source = $source.provider_measurements
+  }
+  return [ordered]@{
+    input_tokens = Get-RkProperty -Object $source -Name 'input_tokens'
+    cached_input_tokens = Get-RkProperty -Object $source -Name 'cached_input_tokens'
+    output_tokens = Get-RkProperty -Object $source -Name 'output_tokens'
+    reasoning_tokens = Get-RkProperty -Object $source -Name 'reasoning_tokens'
+    total_tokens = Get-RkProperty -Object $source -Name 'total_tokens'
+    tool_calls = Get-RkProperty -Object $source -Name 'tool_calls'
+    agent_count = Get-RkProperty -Object $source -Name 'agent_count'
+    duration_seconds = Get-RkProperty -Object $source -Name 'duration_seconds'
+  }
+}
+
+function ConvertTo-RkTelemetryIntegrity {
+  param([object]$Integrity)
+
+  $source = $Integrity
+  return [ordered]@{
+    source_dirty = Get-RkProperty -Object $source -Name 'source_dirty'
+    raw_packet_sha256 = Get-RkProperty -Object $source -Name 'raw_packet_sha256'
+    telemetry_sha256 = Get-RkProperty -Object $source -Name 'telemetry_sha256'
+    historical_materials_unchanged = Get-RkProperty -Object $source -Name 'historical_materials_unchanged'
+    integrity_status = if ($null -eq (Get-RkProperty -Object $source -Name 'integrity_status')) { 'UNVERIFIED' } else { Get-RkProperty -Object $source -Name 'integrity_status' }
+  }
+}
+
+function New-ReasonKitTelemetryRecord {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RunId,
+    [Parameter(Mandatory = $true)]
+    [string]$TaskId,
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('A', 'B', 'C', 'D')]
+    [string]$Arm,
+    [Parameter(Mandatory = $false)]
+    [object]$CandidateManifest,
+    [string]$SourceTag,
+    [string]$SourceCommit,
+    [string]$TaskHash,
+    [string]$FixtureHash,
+    [string]$HostFingerprint,
+    [string]$KernelId,
+    [string]$KernelSha256,
+    [string]$ModuleManifestSha256,
+    [string]$RunnerSha256,
+    [string]$AdapterSha256,
+    [object]$Context,
+    [object]$Specialists,
+    [object]$Outcome,
+    [object]$ProviderMeasurements,
+    [object]$Integrity
+  )
+
+  $candidateId = Get-RkProperty -Object $CandidateManifest -Name 'candidate_id'
+  $candidateVersion = Get-RkProperty -Object $CandidateManifest -Name 'candidate_version'
+  $candidateManifestSha = Get-RkProperty -Object $CandidateManifest -Name 'candidate_manifest_sha256'
+  if ([string]::IsNullOrWhiteSpace($SourceCommit)) {
+    $SourceCommit = Get-RkProperty -Object $CandidateManifest -Name 'source_commit'
+  }
+  if ([string]::IsNullOrWhiteSpace($KernelSha256)) {
+    $KernelSha256 = Get-RkProperty -Object $CandidateManifest -Name 'kernel_sha256'
+  }
+  if ([string]::IsNullOrWhiteSpace($ModuleManifestSha256)) {
+    $ModuleManifestSha256 = Get-RkProperty -Object $CandidateManifest -Name 'module_manifest_sha256'
+  }
+
+  $document = [pscustomobject][ordered]@{
+    schema_version = '0.2'
+    identity = [ordered]@{
+      run_id = $RunId
+      task_id = $TaskId
+      arm = $Arm
+      candidate_id = if ([string]::IsNullOrWhiteSpace([string]$candidateId)) { $null } else { $candidateId }
+      candidate_version = if ([string]::IsNullOrWhiteSpace([string]$candidateVersion)) { $null } else { $candidateVersion }
+      candidate_manifest_sha256 = if ([string]::IsNullOrWhiteSpace([string]$candidateManifestSha)) { $null } else { ([string]$candidateManifestSha).ToLowerInvariant() }
+      telemetry_schema_version = '0.2'
+    }
+    provenance = [ordered]@{
+      source_tag = if ([string]::IsNullOrWhiteSpace($SourceTag)) { $null } else { $SourceTag }
+      source_commit = if ([string]::IsNullOrWhiteSpace($SourceCommit)) { $null } else { $SourceCommit.ToLowerInvariant() }
+      task_hash = if ([string]::IsNullOrWhiteSpace($TaskHash)) { $null } else { $TaskHash.ToLowerInvariant() }
+      fixture_hash = if ([string]::IsNullOrWhiteSpace($FixtureHash)) { $null } else { $FixtureHash.ToLowerInvariant() }
+      host_fingerprint = if ([string]::IsNullOrWhiteSpace($HostFingerprint)) { $null } else { $HostFingerprint }
+      kernel_id = if ([string]::IsNullOrWhiteSpace($KernelId)) { $null } else { $KernelId }
+      kernel_sha256 = if ([string]::IsNullOrWhiteSpace($KernelSha256)) { $null } else { $KernelSha256.ToLowerInvariant() }
+      module_manifest_sha256 = if ([string]::IsNullOrWhiteSpace($ModuleManifestSha256)) { $null } else { $ModuleManifestSha256.ToLowerInvariant() }
+      runner_sha256 = if ([string]::IsNullOrWhiteSpace($RunnerSha256)) { $null } else { $RunnerSha256.ToLowerInvariant() }
+      adapter_sha256 = if ([string]::IsNullOrWhiteSpace($AdapterSha256)) { $null } else { $AdapterSha256.ToLowerInvariant() }
+    }
+    context = ConvertTo-RkTelemetryContext -Context $Context
+    specialists = ConvertTo-RkTelemetrySpecialists -Specialists $Specialists
+    outcome = ConvertTo-RkTelemetryOutcome -Outcome $Outcome
+    provider_measurements = ConvertTo-RkTelemetryProviderMeasurements -ProviderMeasurements $ProviderMeasurements
+    integrity = ConvertTo-RkTelemetryIntegrity -Integrity $Integrity
+  }
+  $null = Assert-ReasonKitTelemetryRecord -Document $document
+  return $document
+}
+
+function Assert-ReasonKitTelemetryRecord {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Document,
+    [Parameter(Mandatory = $false)]
+    [string]$SchemaPath
+  )
+
+  foreach ($group in @('identity', 'provenance', 'context', 'specialists', 'outcome', 'provider_measurements', 'integrity')) {
+    if ($null -eq $Document.PSObject.Properties[$group]) {
+      throw ('Telemetry group is missing: ' + $group)
+    }
+  }
+  $identity = Get-RkProperty -Object $Document -Name 'identity'
+  $candidateFields = @(
+    Get-RkProperty -Object $identity -Name 'candidate_id'
+    Get-RkProperty -Object $identity -Name 'candidate_version'
+    Get-RkProperty -Object $identity -Name 'candidate_manifest_sha256'
+  )
+  $candidatePresent = -not [string]::IsNullOrWhiteSpace([string]$candidateFields[0])
+  if ($candidatePresent -and ($candidateFields | Where-Object { [string]::IsNullOrWhiteSpace([string]$_) }).Count -gt 0) {
+    throw 'Candidate telemetry identity is incomplete.'
+  }
+  if (-not $candidatePresent -and ($candidateFields | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }).Count -gt 0) {
+    throw 'Candidate telemetry identity contains a partial binding.'
+  }
+
+  $outcome = Get-RkProperty -Object $Document -Name 'outcome'
+  $failureClass = Get-RkProperty -Object $outcome -Name 'failure_class'
+  if (@($null, 'MODEL_FAIL', 'EVALUATOR_INVALID', 'PROVIDER_ABORTED') -notcontains $failureClass) {
+    throw ('Unknown telemetry failure class: ' + $failureClass)
+  }
+  if ($failureClass -eq 'PROVIDER_ABORTED' -and (Get-RkProperty -Object $outcome -Name 'provider_status') -ne 'ABORTED') {
+    throw 'PROVIDER_ABORTED requires provider_status=ABORTED.'
+  }
+  if ($failureClass -eq 'MODEL_FAIL' -and (Get-RkProperty -Object $outcome -Name 'task_success') -ne $false) {
+    throw 'MODEL_FAIL requires task_success=false.'
+  }
+  if ($failureClass -eq 'EVALUATOR_INVALID' -and (Get-RkProperty -Object $outcome -Name 'evaluator_validity') -ne 'INVALID') {
+    throw 'EVALUATOR_INVALID requires evaluator_validity=INVALID.'
+  }
+  $specialists = Get-RkProperty -Object $Document -Name 'specialists'
+  if ([int](Get-RkProperty -Object $specialists -Name 'specialist_count') -gt $script:SpecialistMax -or
+      @(Get-RkProperty -Object $specialists -Name 'specialist_reports').Count -gt $script:SpecialistMax) {
+    throw 'Telemetry specialist cap exceeded.'
+  }
+
+  if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
+    $SchemaPath = Join-Path $script:ReasonKitRoot 'core/telemetry.schema.json'
+  }
+  if (Test-Path -LiteralPath $SchemaPath -PathType Leaf) {
+    $json = $Document | ConvertTo-Json -Depth 80 -Compress
+    $valid = Test-Json -Json $json -SchemaFile $SchemaPath -ErrorAction Stop
+    if ($valid -ne $true) {
+      throw 'Telemetry record does not satisfy the frozen schema.'
+    }
+  }
+  return $Document
+}
+
+function Update-ReasonKitTelemetryRecord {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$Document,
+    [Parameter(Mandatory = $false)]
+    [object]$Context,
+    [Parameter(Mandatory = $false)]
+    [object]$Specialists,
+    [Parameter(Mandatory = $false)]
+    [object]$Outcome,
+    [Parameter(Mandatory = $false)]
+    [object]$ProviderMeasurements,
+    [Parameter(Mandatory = $false)]
+    [object]$Integrity
+  )
+
+  $updated = ($Document | ConvertTo-Json -Depth 80) | ConvertFrom-Json -Depth 80
+  if ($PSBoundParameters.ContainsKey('Context')) {
+    $updated.context = ConvertTo-RkTelemetryContext -Context $Context
+  }
+  if ($PSBoundParameters.ContainsKey('Specialists')) {
+    $updated.specialists = ConvertTo-RkTelemetrySpecialists -Specialists $Specialists
+  }
+  if ($PSBoundParameters.ContainsKey('Outcome')) {
+    $updated.outcome = ConvertTo-RkTelemetryOutcome -Outcome $Outcome
+  }
+  if ($PSBoundParameters.ContainsKey('ProviderMeasurements')) {
+    $updated.provider_measurements = ConvertTo-RkTelemetryProviderMeasurements -ProviderMeasurements $ProviderMeasurements
+  }
+  if ($PSBoundParameters.ContainsKey('Integrity')) {
+    $updated.integrity = ConvertTo-RkTelemetryIntegrity -Integrity $Integrity
+  }
+  $null = Assert-ReasonKitTelemetryRecord -Document $updated
+  return $updated
+}
+
 Export-ModuleMember -Function @(
   'Read-ReasonKitModuleRegistry',
   'New-ReasonKitRunState',
   'Resolve-ReasonKitContext',
   'Decide-ReasonKitSpecialist',
   'Record-ReasonKitSpecialistStart',
-  'Test-ReasonKitSpecialistReport'
+  'Test-ReasonKitSpecialistReport',
+  'ConvertTo-ReasonKitCanonicalCandidateManifestJson',
+  'Get-ReasonKitCandidateManifestHash',
+  'New-ReasonKitCandidateManifest',
+  'Assert-ReasonKitCandidateManifest',
+  'New-ReasonKitTelemetryRecord',
+  'Assert-ReasonKitTelemetryRecord',
+  'Update-ReasonKitTelemetryRecord'
 )
