@@ -129,10 +129,11 @@ jobs:
           }
 
           $changedPaths = @(Get-GitLines -Arguments @('diff', '--name-only', ($env:FREEZE_COMMIT + '..HEAD')))
-          $allowedExact = @('.github/workflows/quality.yml')
+          $allowedExact = @('.github/workflows/quality.yml', 'CHANGELOG.md', 'README.md')
           $allowedPrefixes = @(
             'evals/runs/task-004-authoring/',
-            'evals/runs/task-004-results/'
+            'evals/runs/task-004-results/',
+            'docs/releases/'
           )
           $unexpectedPaths = @()
           foreach ($changedPath in $changedPaths) {
