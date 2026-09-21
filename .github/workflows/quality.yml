@@ -133,7 +133,9 @@ jobs:
           $allowedPrefixes = @(
             'evals/runs/task-004-authoring/',
             'evals/runs/task-004-results/',
-            'docs/releases/'
+            'docs/releases/',
+            'docs/distribution/',
+            '.github/ISSUE_TEMPLATE/'
           )
           $unexpectedPaths = @()
           foreach ($changedPath in $changedPaths) {
