@@ -21,6 +21,276 @@ jobs:
         shell: bash
         run: python -m pip install --disable-pip-version-check --no-input tiktoken==0.14.0
 
-      - name: Validate scaffold, generated bundles, eval manifest, and Phase 0 controls
+      - name: Validate frozen candidate in its original commit context
         shell: pwsh
-        run: ./scripts/validate.ps1
+        env:
+          FREEZE_COMMIT: 19c2104aee808e9aa9215f6c433f0338e7784677
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = (Get-Location).Path
+          $frozenWorktree = Join-Path $env:RUNNER_TEMP ('reasonkit-v02-frozen-' + $env:GITHUB_RUN_ID)
+          $worktreeAdded = $false
+
+          try {
+            & git -C $repo worktree add --detach $frozenWorktree $env:FREEZE_COMMIT
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Unable to create the frozen candidate validation worktree.'
+            }
+            $worktreeAdded = $true
+
+            Push-Location -LiteralPath $frozenWorktree
+            try {
+              & pwsh -NoProfile -File ./scripts/validate.ps1
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Frozen-commit scripts/validate.ps1 failed.'
+              }
+
+              & pwsh -NoProfile -File ./scripts/build-dist.ps1 -Check
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Frozen-commit scripts/build-dist.ps1 -Check failed.'
+              }
+            }
+            finally {
+              Pop-Location
+            }
+
+            Write-Host 'frozen_worktree_validation=PASS'
+          }
+          finally {
+            if ($worktreeAdded) {
+              & git -C $repo worktree remove --force $frozenWorktree 2>&1 | Out-Null
+              & git -C $repo worktree prune 2>&1 | Out-Null
+            }
+          }
+
+      - name: Validate post-freeze repository and TASK-004 state
+        shell: pwsh
+        env:
+          FREEZE_COMMIT: 19c2104aee808e9aa9215f6c433f0338e7784677
+          EXPECTED_CANDIDATE_ID: rk2-0.2.0
+          EXPECTED_CANDIDATE_VERSION: 0.2.0
+          EXPECTED_CANDIDATE_SOURCE: b421793162e8795200438473805bc5278dba77de
+          EXPECTED_CANDIDATE_FILE_SHA: d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621
+          EXPECTED_CANDIDATE_CANONICAL_SHA: 17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948
+          EXPECTED_TASK004_MANIFEST_SHA: 52ea13454a103ae441a7cf2a96600f35b64838513c00bbee35b103d1fe4b7c40
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = (Get-Location).Path
+          $candidateRelative = 'dist/v0.2/candidate-manifest.json'
+          $candidatePath = Join-Path $repo ($candidateRelative -replace '/', [IO.Path]::DirectorySeparatorChar)
+          $taskPackageRelative = 'evals/runs/task-004-authoring'
+          $taskPackagePath = Join-Path $repo ($taskPackageRelative -replace '/', [IO.Path]::DirectorySeparatorChar)
+          $taskManifestRelative = "$taskPackageRelative/freeze/FREEZE-MANIFEST.json"
+          $taskManifestPath = Join-Path $repo ($taskManifestRelative -replace '/', [IO.Path]::DirectorySeparatorChar)
+
+          function Get-GitLines {
+            param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+            $lines = @(
+              & git -C $repo @Arguments 2>&1 |
+                ForEach-Object { $_.ToString() }
+            )
+            if ($LASTEXITCODE -ne 0) {
+              throw ('Git command failed: ' + ($Arguments -join ' '))
+            }
+            return $lines
+          }
+
+          function Get-GitText {
+            param([Parameter(Mandatory = $true)][string[]]$Arguments)
+            return ((Get-GitLines -Arguments $Arguments) -join "`n").Trim()
+          }
+
+          function Get-RepoFile {
+            param([Parameter(Mandatory = $true)][string]$RelativePath)
+
+            $fullPath = [IO.Path]::GetFullPath(
+              (Join-Path $repo ($RelativePath -replace '/', [IO.Path]::DirectorySeparatorChar))
+            )
+            $repoPrefix = ([IO.Path]::GetFullPath($repo)).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+            if (-not $fullPath.StartsWith($repoPrefix, [StringComparison]::Ordinal)) {
+              throw ('Repository path escaped the checkout: ' + $RelativePath)
+            }
+            return $fullPath
+          }
+
+          if (@(Get-GitLines -Arguments @('status', '--porcelain')).Count -ne 0) {
+            throw 'Current checkout is not clean.'
+          }
+
+          & git -C $repo diff --check
+          if ($LASTEXITCODE -ne 0) {
+            throw 'git diff --check failed.'
+          }
+
+          & git -C $repo merge-base --is-ancestor $env:FREEZE_COMMIT HEAD
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The frozen candidate freeze commit is not an ancestor of HEAD.'
+          }
+
+          $changedPaths = @(Get-GitLines -Arguments @('diff', '--name-only', ($env:FREEZE_COMMIT + '..HEAD')))
+          $allowedExact = @('.github/workflows/quality.yml')
+          $allowedPrefixes = @('evals/runs/task-004-authoring/')
+          $unexpectedPaths = @()
+          foreach ($changedPath in $changedPaths) {
+            if ([string]::IsNullOrWhiteSpace($changedPath)) {
+              continue
+            }
+            $allowed = $allowedExact -contains $changedPath
+            if (-not $allowed) {
+              foreach ($prefix in $allowedPrefixes) {
+                if ($changedPath.StartsWith($prefix, [StringComparison]::Ordinal)) {
+                  $allowed = $true
+                  break
+                }
+              }
+            }
+            if (-not $allowed) {
+              $unexpectedPaths += $changedPath
+            }
+          }
+          if ($unexpectedPaths.Count -gt 0) {
+            throw ('Post-freeze path allowlist violation: ' + ($unexpectedPaths -join ', '))
+          }
+
+          if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+            throw 'Frozen candidate manifest is missing.'
+          }
+          $candidateFileSha = (Get-FileHash -LiteralPath $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($candidateFileSha -ne $env:EXPECTED_CANDIDATE_FILE_SHA) {
+            throw ('Frozen candidate manifest file SHA256 mismatch: ' + $candidateFileSha)
+          }
+          $candidate = Get-Content -LiteralPath $candidatePath -Raw | ConvertFrom-Json -Depth 80
+          if ([string]$candidate.candidate_id -cne $env:EXPECTED_CANDIDATE_ID) {
+            throw 'Frozen candidate_id mismatch.'
+          }
+          if ([string]$candidate.candidate_version -cne $env:EXPECTED_CANDIDATE_VERSION) {
+            throw 'Frozen candidate_version mismatch.'
+          }
+          if ([string]$candidate.source_commit -cne $env:EXPECTED_CANDIDATE_SOURCE) {
+            throw 'Frozen candidate source_commit mismatch.'
+          }
+          if ([string]$candidate.candidate_manifest_sha256 -cne $env:EXPECTED_CANDIDATE_CANONICAL_SHA) {
+            throw 'Frozen candidate canonical digest mismatch.'
+          }
+
+          $coveredFiles = @($candidate.covered_files)
+          if ($coveredFiles.Count -ne 55) {
+            throw ('Frozen candidate covered-file count mismatch: ' + $coveredFiles.Count)
+          }
+          $coveredPaths = [Collections.Generic.HashSet[string]]::new()
+          foreach ($entry in $coveredFiles) {
+            $relativePath = [string]$entry.repository_relative_path
+            if ([string]::IsNullOrWhiteSpace($relativePath) -or -not $coveredPaths.Add($relativePath)) {
+              throw ('Duplicate or empty frozen candidate path: ' + $relativePath)
+            }
+            $filePath = Get-RepoFile -RelativePath $relativePath
+            if (-not (Test-Path -LiteralPath $filePath -PathType Leaf)) {
+              throw ('Frozen candidate covered file is missing: ' + $relativePath)
+            }
+            $actualSha = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            $actualBytes = [IO.File]::ReadAllBytes($filePath).Length
+            if ($actualSha -ne ([string]$entry.sha256).ToLowerInvariant()) {
+              throw ('Frozen candidate covered-file SHA256 mismatch: ' + $relativePath)
+            }
+            if ($actualBytes -ne [int64]$entry.bytes) {
+              throw ('Frozen candidate covered-file byte mismatch: ' + $relativePath)
+            }
+          }
+
+          $taskVerifier = Join-Path $taskPackagePath ('evaluator-only' + [IO.Path]::DirectorySeparatorChar + 'verify-task-004.ps1')
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File $taskVerifier
+          if ($LASTEXITCODE -ne 0) {
+            throw 'TASK-004 independent authoring verifier failed.'
+          }
+
+          if (-not (Test-Path -LiteralPath $taskManifestPath -PathType Leaf)) {
+            throw 'TASK-004 freeze manifest is missing.'
+          }
+          $taskManifestSha = (Get-FileHash -LiteralPath $taskManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($taskManifestSha -ne $env:EXPECTED_TASK004_MANIFEST_SHA) {
+            throw ('TASK-004 freeze manifest SHA256 mismatch: ' + $taskManifestSha)
+          }
+          $taskManifest = Get-Content -LiteralPath $taskManifestPath -Raw | ConvertFrom-Json -Depth 40
+          if ([int]$taskManifest.normative_file_count -ne 28 -or [int]$taskManifest.entry_count_excluding_self -ne 27) {
+            throw 'TASK-004 normative file count mismatch.'
+          }
+          $taskEntries = @($taskManifest.entries)
+          if ($taskEntries.Count -ne 27) {
+            throw ('TASK-004 manifest entry count mismatch: ' + $taskEntries.Count)
+          }
+          $validClassifications = @('model-visible', 'evaluator-only', 'protocol-control')
+          $taskPaths = @($taskEntries | ForEach-Object { [string]$_.repository_relative_path })
+          if ((@($taskPaths | Sort-Object -Unique)).Count -ne $taskPaths.Count) {
+            throw 'TASK-004 freeze manifest contains duplicate paths.'
+          }
+          $sortedTaskPaths = @($taskPaths | Sort-Object)
+          for ($index = 0; $index -lt $taskPaths.Count; $index += 1) {
+            if ($taskPaths[$index] -cne $sortedTaskPaths[$index]) {
+              throw 'TASK-004 freeze manifest ordering is not deterministic.'
+            }
+          }
+
+          $packagePrefix = $taskPackageRelative + '/'
+          foreach ($entry in $taskEntries) {
+            $repositoryPath = [string]$entry.repository_relative_path
+            if (-not $repositoryPath.StartsWith($packagePrefix, [StringComparison]::Ordinal)) {
+              throw ('TASK-004 manifest path escaped the package: ' + $repositoryPath)
+            }
+            if ($validClassifications -notcontains [string]$entry.classification) {
+              throw ('Invalid TASK-004 classification: ' + $entry.classification)
+            }
+            $relativePath = $repositoryPath.Substring($packagePrefix.Length)
+            $filePath = Get-RepoFile -RelativePath $repositoryPath
+            if (-not (Test-Path -LiteralPath $filePath -PathType Leaf)) {
+              throw ('TASK-004 manifest file is missing: ' + $repositoryPath)
+            }
+            $actualSha = (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            $actualBytes = [IO.File]::ReadAllBytes($filePath).Length
+            if ($actualSha -ne ([string]$entry.sha256).ToLowerInvariant() -or $actualBytes -ne [int64]$entry.bytes) {
+              throw ('TASK-004 manifest byte identity mismatch: ' + $repositoryPath)
+            }
+
+            switch ([string]$entry.classification) {
+              'model-visible' {
+                if ($relativePath -ne 'task.md' -and $relativePath -ne 'acceptance.md' -and -not $relativePath.StartsWith('fixture-public/', [StringComparison]::Ordinal)) {
+                  throw ('Unexpected model-visible TASK-004 path: ' + $relativePath)
+                }
+              }
+              'evaluator-only' {
+                if (-not $relativePath.StartsWith('evaluator-only/', [StringComparison]::Ordinal)) {
+                  throw ('Unexpected evaluator-only TASK-004 path: ' + $relativePath)
+                }
+              }
+              'protocol-control' {
+                $isRootControl = @('README.md', 'rubric.md', 'validity-rules.md', 'run-order.md', 'TASK-004-PROTOCOL.md') -contains $relativePath
+                if (-not $isRootControl -and -not $relativePath.StartsWith('freeze/', [StringComparison]::Ordinal)) {
+                  throw ('Unexpected protocol-control TASK-004 path: ' + $relativePath)
+                }
+              }
+            }
+          }
+
+          $allTaskFiles = @(Get-ChildItem -LiteralPath $taskPackagePath -Recurse -File)
+          if ($allTaskFiles.Count -ne 28) {
+            throw ('TASK-004 package file count mismatch: ' + $allTaskFiles.Count)
+          }
+          $manifestFullPath = [IO.Path]::GetFullPath($taskManifestPath)
+          $nonManifestFiles = @($allTaskFiles | Where-Object { [IO.Path]::GetFullPath($_.FullName) -ne $manifestFullPath })
+          if ($nonManifestFiles.Count -ne 27) {
+            throw ('TASK-004 non-manifest file count mismatch: ' + $nonManifestFiles.Count)
+          }
+          $actualPackagePaths = @($nonManifestFiles | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($repo, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, '/')
+            $relative
+          })
+          if ((Compare-Object ($taskPaths | Sort-Object) ($actualPackagePaths | Sort-Object))) {
+            throw 'TASK-004 manifest does not cover exactly the normative package files.'
+          }
+
+          Write-Host ('post_freeze_head=' + (Get-GitText -Arguments @('rev-parse', 'HEAD')))
+          Write-Host ('post_freeze_changed_paths=' + $changedPaths.Count)
+          Write-Host 'post_freeze_path_allowlist=PASS'
+          Write-Host 'candidate_integrity=PASS covered_files=55'
+          Write-Host 'task004_verifier=PASS'
+          Write-Host 'task004_freeze_manifest=PASS entries=27 normative_files=28'
