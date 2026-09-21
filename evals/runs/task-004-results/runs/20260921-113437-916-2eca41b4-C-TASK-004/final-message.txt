@@ -1,0 +1,10 @@
+Verification status: PASS
+
+- Initial test: `npm test` — FAIL; workspace profiles collided in the cache.
+- Confirmed cause: `src/config-loader.js` keyed cached bases only by `profile`, so identical profiles across workspaces reused the wrong file values.
+- Change: cache key now uses normalized `path.resolve(rootDir)` plus profile. Per-call environment and explicit overrides remain applied after cache retrieval.
+- Files changed: [`src/config-loader.js`](/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113437-916-2eca41b4-C-TASK-004/workspace/src/config-loader.js)
+- Final test: `npm test` — PASS.
+- Focused check: equivalent root spellings reused one cache entry while per-call overlays remained distinct — PASS.
+- Unresolved unknowns: none material.
+- Stop reason: acceptance criteria satisfied; patch is limited to the confirmed runtime path.

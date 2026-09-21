@@ -1,0 +1,6 @@
+{
+  "serviceName": "beta-api",
+  "region": "us-east",
+  "port": 7202,
+  "timeoutMs": 2500
+}

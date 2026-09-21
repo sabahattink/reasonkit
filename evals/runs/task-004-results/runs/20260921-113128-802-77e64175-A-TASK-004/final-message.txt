@@ -1,0 +1,10 @@
+PASS
+
+- Initial test: `npm test` failed due to workspace/profile cache mixing.
+- Root cause: `src/config-loader.js` cached only by profile, so identical profiles across workspaces shared file values.
+- Changed: [src/config-loader.js](/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113128-802-77e64175-A-TASK-004/workspace/src/config-loader.js) now keys cache entries by `path.resolve(rootDir)` and profile.
+- Runtime path confirmed: loader → cache → profile source → environment overlay.
+- Final test: `npm test` PASS.
+- Focused normalized-root/per-call-overlay check: PASS.
+- No tests, fixtures, metadata, dependencies, or helpers changed.
+- Remaining assumption: normalization means lexical `path.resolve()` equivalence; symlink canonicalization was not tested.

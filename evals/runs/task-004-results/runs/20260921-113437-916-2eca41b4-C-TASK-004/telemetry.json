@@ -1,0 +1,132 @@
+{
+  "schema_version": "0.2",
+  "identity": {
+    "run_id": "20260921-113437-916-2eca41b4-C-TASK-004",
+    "task_id": "TASK-004",
+    "arm": "C",
+    "candidate_id": "rk2-0.2.0",
+    "candidate_version": "0.2.0",
+    "candidate_manifest_sha256": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "telemetry_schema_version": "0.2"
+  },
+  "provenance": {
+    "source_tag": null,
+    "source_commit": "b421793162e8795200438473805bc5278dba77de",
+    "task_hash": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+    "fixture_hash": "c5f82eec60f37bf3d113a065601e62c99f5832a6a85b95bd66726c1dc7d6b518",
+    "host_fingerprint": null,
+    "kernel_id": "core.tiny-kernel",
+    "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+    "module_manifest_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+    "runner_sha256": "22afbd5791612174a21e4aa23dfe880e8e29a3f79def696d0fc89f14ece7de24",
+    "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251"
+  },
+  "context": {
+    "kernel_bytes": 1307,
+    "kernel_tokens": 247,
+    "loader_index_bytes": 1680,
+    "loader_index_tokens": 420,
+    "loader_request_count": 1,
+    "loader_decision_duration_ms": 0.001,
+    "route": "debugging",
+    "selected_complexity": "L2",
+    "modules_loaded": [
+      {
+        "module_id": "protocol.debugging",
+        "module_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+        "module_bytes": 954,
+        "module_tokens": 200,
+        "load_reason": "route selected from TASK-004 debugging evidence",
+        "load_phase": "evidence",
+        "module_reuse": {
+          "reused": false,
+          "count": 0,
+          "scope": "none",
+          "reason": null
+        },
+        "load_action": "loaded",
+        "previous_sha256": null,
+        "reload_reason": null,
+        "context_injected": true
+      }
+    ],
+    "omitted_context": {
+      "source_manifest_sha256": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+      "module_ids": [
+        "protocol.coding",
+        "protocol.architecture",
+        "protocol.research",
+        "protocol.design",
+        "taste.anti-generic",
+        "protocol.computer-use",
+        "core.computer-use-policy"
+      ],
+      "bytes": 8744,
+      "tokens": 1806,
+      "derivation": "registry modules not selected by the debugging route",
+      "status": "derived"
+    },
+    "full_bundle": {
+      "loaded": false,
+      "escalation_reason": null,
+      "requested_by": null,
+      "approved_by_or_gate": null,
+      "source_hash": null,
+      "loaded_bytes": 0,
+      "loaded_tokens_if_deterministic": null
+    },
+    "instruction_bytes": 1307
+  },
+  "specialists": {
+    "specialist_gate": {
+      "considered": false,
+      "started": false,
+      "trigger": [],
+      "evidence_state": "not_attempted",
+      "competing_hypotheses": 0,
+      "rejection_reason": "No host-level specialist request was emitted; provider agent events are recorded separately.",
+      "role": null
+    },
+    "specialist_roles": [],
+    "specialist_count": 0,
+    "specialist_reports": []
+  },
+  "outcome": {
+    "verification": {
+      "result": "NOT_RUN",
+      "evidence": []
+    },
+    "stop": {
+      "decision": "CONTINUE",
+      "reason": "Awaiting host and evaluator evidence."
+    },
+    "provider_status": "COMPLETED",
+    "model_completion_status": "COMPLETED",
+    "task_success": true,
+    "scope_violation": false,
+    "evaluator_validity": "VALID",
+    "changed_files": [
+      "src/config-loader.js"
+    ],
+    "tests_weakened": false,
+    "dependencies_changed": false,
+    "failure_class": null
+  },
+  "provider_measurements": {
+    "input_tokens": 155471,
+    "cached_input_tokens": 137728,
+    "output_tokens": 2929,
+    "reasoning_tokens": 954,
+    "total_tokens": null,
+    "tool_calls": 15,
+    "agent_count": 0,
+    "duration_seconds": 48.169287663000034
+  },
+  "integrity": {
+    "source_dirty": true,
+    "raw_packet_sha256": null,
+    "telemetry_sha256": null,
+    "historical_materials_unchanged": null,
+    "integrity_status": "UNVERIFIED"
+  }
+}

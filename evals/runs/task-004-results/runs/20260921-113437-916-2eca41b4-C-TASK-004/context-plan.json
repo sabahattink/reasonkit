@@ -1,0 +1,76 @@
+{
+  "schema_version": "0.2",
+  "plan_type": "context-plan",
+  "task_id": "TASK-004",
+  "arm_id": "C",
+  "instruction_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+  "instruction_bytes": 1307,
+  "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+  "module_manifest_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+  "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+  "binding": {
+    "adapter_path": "adapters/generic/SYSTEM.md",
+    "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+    "kernel_path": "dist/v0.2/reasonkit-kernel.md",
+    "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+    "registry_path": "core/module-registry.json",
+    "registry_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+    "implementation_path": "scripts/reasonkit-v02.psm1",
+    "implementation_sha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+    "route": "debugging",
+    "full_bundle_fallback": false
+  },
+  "route": "debugging",
+  "selected_complexity": "L2",
+  "modules_loaded": [
+    {
+      "module_id": "protocol.debugging",
+      "module_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+      "module_bytes": 954,
+      "module_tokens": 200,
+      "load_reason": "route selected from TASK-004 debugging evidence",
+      "load_phase": "evidence",
+      "module_reuse": {
+        "reused": false,
+        "count": 0,
+        "scope": "none",
+        "reason": null
+      },
+      "load_action": "loaded",
+      "previous_sha256": null,
+      "reload_reason": null,
+      "context_injected": true,
+      "source_path": "protocols/debugging.md",
+      "candidate_role": "loadable_module"
+    }
+  ],
+  "status": "RESOLVED",
+  "omitted_context": {
+    "source_manifest_sha256": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "module_ids": [
+      "protocol.coding",
+      "protocol.architecture",
+      "protocol.research",
+      "protocol.design",
+      "taste.anti-generic",
+      "protocol.computer-use",
+      "core.computer-use-policy"
+    ],
+    "bytes": 8744,
+    "tokens": 1806,
+    "derivation": "registry modules not selected by the debugging route",
+    "status": "derived"
+  },
+  "full_bundle_loaded": false,
+  "loader_request_count": 1,
+  "loader_decision_duration_ms": 0.001,
+  "resolution": "candidate-bound registry route resolution",
+  "implementation_binding": {
+    "candidate_id": "rk2-0.2.0",
+    "candidate_version": "0.2.0",
+    "candidate_manifest_sha256": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "registry_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+    "implementation_sha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+    "full_bundle_fallback": false
+  }
+}

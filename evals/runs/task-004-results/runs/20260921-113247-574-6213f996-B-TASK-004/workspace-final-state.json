@@ -1,0 +1,80 @@
+{
+  "workspace": "workspace/",
+  "file_count": 14,
+  "digest": "b547cc6f163f9d3946441e18d0f07bfedf709cccafc96246bcdcab79684e3c0e",
+  "files": [
+    {
+      "path": "acceptance.md",
+      "bytes": 1405,
+      "sha256": "bad9097b337bc18b5ae37c3f1a83f00fa530a61006050f859bb756806463e214"
+    },
+    {
+      "path": "notes/incident.md",
+      "bytes": 450,
+      "sha256": "8800ce3d41d3028dab960dd29c6df0d417920dda5d7542cd394cfa1e6a123d48"
+    },
+    {
+      "path": "package.json",
+      "bytes": 196,
+      "sha256": "25976ede81d13265fbb9b6a113a218bc9d6da1a899254dec8ff6898a78337e31"
+    },
+    {
+      "path": "README.md",
+      "bytes": 548,
+      "sha256": "c1af3297b16b0403d547ec993d9b2716cc6c367b3c52737967170332fd7114ec"
+    },
+    {
+      "path": "src/config-cache.js",
+      "bytes": 349,
+      "sha256": "9e703b7a031a76a190e244cf9cd6dc08a88c2bbdbcdd1b01a34252e3153bc9f7"
+    },
+    {
+      "path": "src/config-loader.js",
+      "bytes": 945,
+      "sha256": "e2791ab991fbe2ddcdffd1cc5b47d4e3cec7a9e5b67e5e8dcfd6e90a45067d54"
+    },
+    {
+      "path": "src/default-config.js",
+      "bytes": 181,
+      "sha256": "8d1d0538597c8a2470ebb94d67f300d6d3ee7728d7e3b33abb22ecb30185e8d3"
+    },
+    {
+      "path": "src/diagnostics.js",
+      "bytes": 129,
+      "sha256": "37cae0c3afba472fc119c614246454df45c1f8f65fc8b9e99e1dcf61d42ceeec"
+    },
+    {
+      "path": "src/env-overrides.js",
+      "bytes": 766,
+      "sha256": "052504507f020b1bedfe0186d7c319dab5ca2681e4890d7d830094e038b30751"
+    },
+    {
+      "path": "src/profile-source.js",
+      "bytes": 290,
+      "sha256": "54563053c4b25de37f694b93429896186d297816f4be6148f72661611070fd6a"
+    },
+    {
+      "path": "tests/config-loader.test.js",
+      "bytes": 2071,
+      "sha256": "5bf52f51f6edf043b74f87b6b6c440927de2026239580c3c108579b5c707a6c3"
+    },
+    {
+      "path": "workspaces/alpha/config/development.json",
+      "bytes": 96,
+      "sha256": "c5c4f21834d7078793a413cfbe1a9e865b5375eb08c872cbb65adce996abcd1e"
+    },
+    {
+      "path": "workspaces/beta/config/development.json",
+      "bytes": 92,
+      "sha256": "f626864bf693c6e175dfc93c7fcbb56fca79fa490b1ef0b42969c30138dd55ff"
+    },
+    {
+      "path": "workspaces/gamma/config/development.json",
+      "bytes": 97,
+      "sha256": "17c18d3e571f06064231d54c6da136aedc6e076146b239d2014e49a2c55caa97"
+    }
+  ],
+  "changed_files": [
+    "src/config-loader.js"
+  ]
+}

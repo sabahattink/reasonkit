@@ -1,0 +1,19 @@
+Status: PASS
+
+Acceptance condition: Workspace/profile cache isolation, normalized-root reuse, and per-call overlays while retaining caching.
+
+Evidence and decision:
+
+- Initial `npm test`: failed.
+- Root cause: `src/config-loader.js` keyed cache entries only by profile, so workspaces shared cached file values.
+- Changed only `src/config-loader.js`; cache key is now normalized root plus profile.
+- Existing per-call environment and request merges remain after cache lookup.
+
+Checks:
+
+- Final `npm test`: PASS.
+- Focused normalized-root and overlay check: PASS; equivalent roots read once and per-call values remained distinct.
+
+Residual unknowns: None relevant to the stated acceptance criteria.
+
+Stop reason: Requested behavior is fixed and verified.

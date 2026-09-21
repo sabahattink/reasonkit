@@ -1,0 +1,162 @@
+{
+  "schema_version": "task-004-finalized-evidence-1",
+  "run_id": "20260921-113557-340-c8f75f36-D-TASK-004",
+  "arm": "D",
+  "provider_status": "COMPLETED",
+  "model_completion_status": "COMPLETED",
+  "public_result": "PASS",
+  "hidden_result": "PASS",
+  "evaluator_validity": true,
+  "changed_files": [
+    "src/config-loader.js"
+  ],
+  "scope_violation": false,
+  "scope_evidence": {
+    "raw_host_scope_violation": false,
+    "raw_host_markers": [],
+    "command_path_markers": [],
+    "public_material_reference_only": false,
+    "note": null
+  },
+  "task_success": true,
+  "failure_class": null,
+  "frozen_rubric_score": 4,
+  "diagnosis_and_verification_evidence": {
+    "initial_failure": true,
+    "root_cause": true,
+    "production_change": true,
+    "final_verification": true,
+    "focused_check": true
+  },
+  "provider_measurements": {
+    "input_tokens": 129795,
+    "cached_input_tokens": 121728,
+    "output_tokens": 1068,
+    "reasoning_tokens": 22,
+    "total_tokens": null,
+    "tool_calls": 8,
+    "agent_count": 0,
+    "agent_start_events": 0
+  },
+  "instruction_bytes": 0,
+  "recovery_of": null,
+  "raw_artifact_paths": {
+    "run": "runs/20260921-113557-340-c8f75f36-D-TASK-004/run.json",
+    "raw_model_output": "runs/20260921-113557-340-c8f75f36-D-TASK-004/model-output.txt",
+    "provider_events": "runs/20260921-113557-340-c8f75f36-D-TASK-004/events.jsonl",
+    "provider_stderr": "runs/20260921-113557-340-c8f75f36-D-TASK-004/stderr.txt",
+    "provider_metadata": "runs/20260921-113557-340-c8f75f36-D-TASK-004/host-config.json",
+    "public_verification": "runs/20260921-113557-340-c8f75f36-D-TASK-004/public-verification.txt",
+    "hidden_evaluator": "runs/20260921-113557-340-c8f75f36-D-TASK-004/hidden-evaluator.txt",
+    "workspace": "runs/20260921-113557-340-c8f75f36-D-TASK-004/workspace/",
+    "workspace_diff": "runs/20260921-113557-340-c8f75f36-D-TASK-004/workspace-diff.patch"
+  },
+  "name": "Astra vanilla",
+  "reasonkit": {
+    "adaptive_context_activated": false,
+    "route": null,
+    "selected_complexity": null,
+    "modules_loaded": [],
+    "modules_reused": [],
+    "full_bundle_loaded": null,
+    "specialist_authorization_count": null,
+    "specialist_authorized_roles": [],
+    "actual_provider_agent_start_events": null,
+    "actual_specialist_started_roles": [],
+    "specialist_observation_note": "No ReasonKit specialist API request was emitted by the host; provider agent events are reported separately."
+  },
+  "artifact_manifest": {
+    "artifacts": [
+      {
+        "path": "run.json",
+        "bytes": 2361,
+        "sha256": "d017a843a323eb6ab111ac9b7e13078827c82f54f3d19120ba2f2e7b95f31725"
+      },
+      {
+        "path": "context-plan.json",
+        "bytes": 557,
+        "sha256": "da400e1d6400c6c19884245b090910d06c3823ce7ff427dc52c9da2882c79401"
+      },
+      {
+        "path": "telemetry.json",
+        "bytes": 3154,
+        "sha256": "dc7ecb55bac0015a2af71349b8ec996dd9d3cb6b7669424536ee3529810ffe71"
+      },
+      {
+        "path": "metrics.json",
+        "bytes": 1869,
+        "sha256": "0286873f4ddba2a163c414f1b93bb7d7a6a29b34ffa5d0f1379dc2f1d7c271bb"
+      },
+      {
+        "path": "benchmark-evidence.json",
+        "bytes": 1984,
+        "sha256": "ed64c789225c86d2242e380d90862c81c2d9c86cd172000462a55b9aa172434f"
+      },
+      {
+        "path": "events.jsonl",
+        "bytes": 16871,
+        "sha256": "5f20e1f313f9a4595e8e7275ac3fb45b88969223cef3efc616f30672ec14c641"
+      },
+      {
+        "path": "stderr.txt",
+        "bytes": 1025,
+        "sha256": "c90bf350ce0872b70f3b6daf971390fa1020f3916e6738a15e10c1aa6d7f2230"
+      },
+      {
+        "path": "model-output.txt",
+        "bytes": 767,
+        "sha256": "e9de57018e259d6ec9f63910857518870e72f2e25761e238bf531625c47329f7"
+      },
+      {
+        "path": "prompt-sent.txt",
+        "bytes": 2230,
+        "sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a"
+      },
+      {
+        "path": "prompt-identity.json",
+        "bytes": 102,
+        "sha256": "3a5b992a5b64e3742eb6f7076a4aa07d607fc6df3dd491395df6ee123654e856"
+      },
+      {
+        "path": "host-config.json",
+        "bytes": 1383,
+        "sha256": "88082906fa1855adaa4b7fb56d818a13ac23642c3f4b7fa4c42aaf42e58dcbbc"
+      },
+      {
+        "path": "codex-command.json",
+        "bytes": 924,
+        "sha256": "e6d95f2abeea705de984b63f933151411dd5333a7b8d3ea619286e99c9ce4b00"
+      },
+      {
+        "path": "public-verification.txt",
+        "bytes": 844,
+        "sha256": "6d2c1d5fb169eb601a881c2500fcf97f066df2e705c6ee6ccdda883814e0ac55"
+      },
+      {
+        "path": "hidden-evaluator.txt",
+        "bytes": 515,
+        "sha256": "beadb8be7b33698b52fff76e2cd4697cd184d18a614a8368df2b981d46e1f71a"
+      },
+      {
+        "path": "lifecycle-start.json",
+        "bytes": 714,
+        "sha256": "e5a39a3f92bd7521b88edbb7644b38cb686ab67942ea60cc22d00a554ff06a36"
+      },
+      {
+        "path": "lifecycle-end.json",
+        "bytes": 926,
+        "sha256": "634b4047949ec495ab90febdf56c4e8461f83277a7b3aa0ceb43f0199be86d2d"
+      },
+      {
+        "path": "workspace-diff.patch",
+        "bytes": 621,
+        "sha256": "fa5771f2031eae8df457bb4e1743cbf4fcb3d3288b15795631995d4a69bf99d9"
+      },
+      {
+        "path": "workspace-final-state.json",
+        "bytes": 2393,
+        "sha256": "c49091e7453e182688209cb2d8592d3261114ad1f7657aa093f7547ac15b2ff6"
+      }
+    ]
+  }
+}

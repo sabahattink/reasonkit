@@ -1,0 +1,6 @@
+{
+  "serviceName": "alpha-api",
+  "region": "eu-central",
+  "port": 7101,
+  "timeoutMs": 1500
+}

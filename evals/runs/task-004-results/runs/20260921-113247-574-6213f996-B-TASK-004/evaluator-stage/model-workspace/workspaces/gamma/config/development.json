@@ -1,0 +1,6 @@
+{
+  "serviceName": "gamma-worker",
+  "region": "ap-south",
+  "port": 7303,
+  "timeoutMs": 3500
+}

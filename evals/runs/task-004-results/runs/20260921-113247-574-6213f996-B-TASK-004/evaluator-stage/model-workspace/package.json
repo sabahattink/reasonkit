@@ -1,0 +1,12 @@
+{
+  "name": "reasonkit-task-004-config-cache",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

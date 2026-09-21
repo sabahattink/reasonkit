@@ -1,0 +1,69 @@
+{
+  "schema_version": "task-004-run-evidence-1",
+  "run_id": "20260921-113247-574-6213f996-B-TASK-004",
+  "arm": "B",
+  "task_id": "TASK-004",
+  "provider": {
+    "exit_code": 0,
+    "timed_out": false,
+    "completion_status": "COMPLETED",
+    "duration_seconds": 49.48126925700001,
+    "measurements": {
+      "input_tokens": 169228,
+      "cached_input_tokens": 153856,
+      "output_tokens": 3095,
+      "reasoning_tokens": 1000,
+      "total_tokens": null,
+      "tool_calls": 9,
+      "agent_count": 0,
+      "agent_start_events": 0
+    }
+  },
+  "public_verification": {
+    "command": "npm test",
+    "exit_code": 0,
+    "timed_out": false,
+    "duration_seconds": 0.129235384000026,
+    "status": "PASS",
+    "output_file": "public-verification.txt"
+  },
+  "hidden_evaluation": {
+    "status": "PASS",
+    "exit_code": 0,
+    "duration_seconds": 0.027972074999979668,
+    "output_file": "hidden-evaluator.txt",
+    "evaluator_stage": "evaluator-stage/",
+    "hidden_script_sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+    "model_workspace_path": "evaluator-stage/model-workspace/"
+  },
+  "workspace": {
+    "changed_files": [
+      "src/config-loader.js"
+    ],
+    "allowed_changes": [
+      "src/config-loader.js"
+    ],
+    "scope_violation": true,
+    "tests_weakened": false,
+    "dependencies_changed": false,
+    "evaluator_access_markers": [
+      "evaluator-only"
+    ]
+  },
+  "rubric_score": 2,
+  "task_success": false,
+  "failure_class": "MODEL_FAIL",
+  "reasonkit": {
+    "adaptive_context_activated": false,
+    "route": null,
+    "selected_complexity": null,
+    "modules_loaded": [],
+    "modules_reused": [],
+    "full_bundle_loaded": null,
+    "specialist_authorization_count": null,
+    "specialist_authorized_roles": [],
+    "actual_provider_agent_start_events": null,
+    "actual_specialist_started_roles": [],
+    "specialist_observation_note": "No ReasonKit specialist API request was emitted by the host; provider agent events are reported separately."
+  }
+}

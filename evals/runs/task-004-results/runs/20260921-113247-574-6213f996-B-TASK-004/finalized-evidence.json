@@ -1,0 +1,164 @@
+{
+  "schema_version": "task-004-finalized-evidence-1",
+  "run_id": "20260921-113247-574-6213f996-B-TASK-004",
+  "arm": "B",
+  "provider_status": "COMPLETED",
+  "model_completion_status": "COMPLETED",
+  "public_result": "PASS",
+  "hidden_result": "PASS",
+  "evaluator_validity": true,
+  "changed_files": [
+    "src/config-loader.js"
+  ],
+  "scope_violation": false,
+  "scope_evidence": {
+    "raw_host_scope_violation": true,
+    "raw_host_markers": [
+      "evaluator-only"
+    ],
+    "command_path_markers": [],
+    "public_material_reference_only": true,
+    "note": "The B marker came from model output of the model-visible public README; no forbidden path occurred in a provider command."
+  },
+  "task_success": true,
+  "failure_class": null,
+  "frozen_rubric_score": 4,
+  "diagnosis_and_verification_evidence": {
+    "initial_failure": true,
+    "root_cause": true,
+    "production_change": true,
+    "final_verification": true,
+    "focused_check": true
+  },
+  "provider_measurements": {
+    "input_tokens": 169228,
+    "cached_input_tokens": 153856,
+    "output_tokens": 3095,
+    "reasoning_tokens": 1000,
+    "total_tokens": null,
+    "tool_calls": 9,
+    "agent_count": 0,
+    "agent_start_events": 0
+  },
+  "instruction_bytes": 1123,
+  "recovery_of": null,
+  "raw_artifact_paths": {
+    "run": "runs/20260921-113247-574-6213f996-B-TASK-004/run.json",
+    "raw_model_output": "runs/20260921-113247-574-6213f996-B-TASK-004/model-output.txt",
+    "provider_events": "runs/20260921-113247-574-6213f996-B-TASK-004/events.jsonl",
+    "provider_stderr": "runs/20260921-113247-574-6213f996-B-TASK-004/stderr.txt",
+    "provider_metadata": "runs/20260921-113247-574-6213f996-B-TASK-004/host-config.json",
+    "public_verification": "runs/20260921-113247-574-6213f996-B-TASK-004/public-verification.txt",
+    "hidden_evaluator": "runs/20260921-113247-574-6213f996-B-TASK-004/hidden-evaluator.txt",
+    "workspace": "runs/20260921-113247-574-6213f996-B-TASK-004/workspace/",
+    "workspace_diff": "runs/20260921-113247-574-6213f996-B-TASK-004/workspace-diff.patch"
+  },
+  "name": "Luna + Reliable Engineering v0.1",
+  "reasonkit": {
+    "adaptive_context_activated": false,
+    "route": null,
+    "selected_complexity": null,
+    "modules_loaded": [],
+    "modules_reused": [],
+    "full_bundle_loaded": null,
+    "specialist_authorization_count": null,
+    "specialist_authorized_roles": [],
+    "actual_provider_agent_start_events": null,
+    "actual_specialist_started_roles": [],
+    "specialist_observation_note": "No ReasonKit specialist API request was emitted by the host; provider agent events are reported separately."
+  },
+  "artifact_manifest": {
+    "artifacts": [
+      {
+        "path": "run.json",
+        "bytes": 2502,
+        "sha256": "e4efb99cb75a081244b47346606d354f03c666163fc4706ab7b56cac35fe1eb7"
+      },
+      {
+        "path": "context-plan.json",
+        "bytes": 622,
+        "sha256": "0a3713003b83f480d4ae137b17fab610e90693e3e7a8af2952de45e0a144a41d"
+      },
+      {
+        "path": "telemetry.json",
+        "bytes": 3167,
+        "sha256": "7e045668f271149fcd0600f4fdef76ce71b909938bbe6c75b663f073fca9063b"
+      },
+      {
+        "path": "metrics.json",
+        "bytes": 2033,
+        "sha256": "3a3b3e708424db6c16a37e4ef7d0d42f816cf7b637d7bc76c26974c117b9c6ae"
+      },
+      {
+        "path": "benchmark-evidence.json",
+        "bytes": 2022,
+        "sha256": "80c155a2cc057018c44424e40d09085b7620b1e9569754111a526e2d969eb84e"
+      },
+      {
+        "path": "events.jsonl",
+        "bytes": 21307,
+        "sha256": "49292a4490de0f8aaa4904971459aea9071a5dd18e78df56e47d010734c6073b"
+      },
+      {
+        "path": "stderr.txt",
+        "bytes": 1324,
+        "sha256": "6897f1a5cc1ea2b96eae033408cea1acc08aa903e8b547aaefeaf0a67a80a0f4"
+      },
+      {
+        "path": "model-output.txt",
+        "bytes": 753,
+        "sha256": "511e3376505caea23e1334ad7920109dc901a87457287193178271337212d96f"
+      },
+      {
+        "path": "prompt-sent.txt",
+        "bytes": 3376,
+        "sha256": "c5ed81610aeae8a5e860685b08fb106748b76c00daf6b391b6f90dad19554b94"
+      },
+      {
+        "path": "prompt-identity.json",
+        "bytes": 223,
+        "sha256": "03a9acc2afaef0a336ffbd2a1b0697c380140ff7d5ca348846e92570a6751618"
+      },
+      {
+        "path": "host-config.json",
+        "bytes": 1449,
+        "sha256": "ceddfc8ab926bfdf10385f7989cd1b786f67e07492e8204621aaf4aa2d255662"
+      },
+      {
+        "path": "codex-command.json",
+        "bytes": 925,
+        "sha256": "f8c5fe2c51db6abf5597a6a713c8f3f7ce6120b630550cb46391f54d0206c46a"
+      },
+      {
+        "path": "public-verification.txt",
+        "bytes": 842,
+        "sha256": "f8eaec554d382d404aacc16e2bf252df36ecf4a1a62e81c039d45b8fa881bf1f"
+      },
+      {
+        "path": "hidden-evaluator.txt",
+        "bytes": 513,
+        "sha256": "8386c939a3c091a1236e88a42eb0fd0f4db0ddc5f38ca19e09d6fc5986d580c4"
+      },
+      {
+        "path": "lifecycle-start.json",
+        "bytes": 712,
+        "sha256": "f1d2af92a443db3a0b5a5ed23eb4a7390dee40ea4c1b62d02bc984cd154e89d2"
+      },
+      {
+        "path": "lifecycle-end.json",
+        "bytes": 925,
+        "sha256": "38b94b292f0c809e8908fbb3c2be4f3d71d6989bde3042e9aeb97e82948e6b2c"
+      },
+      {
+        "path": "workspace-diff.patch",
+        "bytes": 611,
+        "sha256": "4e7274f84b52a6f75338494abaa742eaa5a49834b69d125d88aa356b45aded0c"
+      },
+      {
+        "path": "workspace-final-state.json",
+        "bytes": 2393,
+        "sha256": "e73cf749918bd7fbf6393a50bfa3c05c6dbe2d65728183c91b27eadaf40f1a85"
+      }
+    ]
+  }
+}
