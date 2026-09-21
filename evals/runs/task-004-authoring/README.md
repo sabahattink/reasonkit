@@ -15,7 +15,7 @@ verification script from the repository root before using this package in an
 actual benchmark arm:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File evals/task-004-authoring/evaluator-only/verify-task-004.ps1
+pwsh -ExecutionPolicy Bypass -File evals/runs/task-004-authoring/evaluator-only/verify-task-004.ps1
 ```
 
 The verifier must be run before any candidate evaluation. It must not invoke

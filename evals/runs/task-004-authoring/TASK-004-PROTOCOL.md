@@ -2,7 +2,7 @@
 
 ## Package boundary
 
-The authoritative package root is `evals/task-004-authoring/`. It is outside
+The authoritative package root is `evals/runs/task-004-authoring/`. It is outside
 the v0.2 candidate manifest coverage. TASK-004 files are historical benchmark
 material and must not be added to or substituted into the frozen candidate.
 

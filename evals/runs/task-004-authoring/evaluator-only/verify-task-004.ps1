@@ -1,13 +1,13 @@
 [CmdletBinding()]
 param(
-  [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path,
+  [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).ProviderPath,
   [switch]$KeepTemp
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$packageRoot = Join-Path $RepoRoot 'evals\task-004-authoring'
+$packageRoot = Join-Path $RepoRoot 'evals\runs\task-004-authoring'
 $fixtureRoot = Join-Path $packageRoot 'fixture-public'
 $hiddenTest = Join-Path $packageRoot 'evaluator-only\hidden-regression.js'
 $referenceLoader = Join-Path $packageRoot 'evaluator-only\reference-fixed\src\config-loader.js'
@@ -89,7 +89,7 @@ try {
   }
 
   $coveredPaths = @($candidateJson.covered_files | ForEach-Object { $_.repository_relative_path })
-  if ($coveredPaths -contains 'evals/task-004-authoring/task.md') {
+  if ($coveredPaths -contains 'evals/runs/task-004-authoring/task.md') {
     throw 'TASK-004 package unexpectedly appears in frozen candidate coverage'
   }
 
