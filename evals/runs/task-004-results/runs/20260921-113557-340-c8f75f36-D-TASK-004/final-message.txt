@@ -1,0 +1,6 @@
+- **Initial verification: FAIL** — `npm test`; direct test execution confirmed beta received `alpha-api` instead of `beta-api`.
+- **Root cause:** the loader keyed cached bases by profile alone, allowing cross-workspace reuse.
+- **Changed:** only `src/config-loader.js`. It now keys by `JSON.stringify([path.resolve(rootDir), profile])`. This file directly performs cache lookup and profile loading, then applies environment and request overrides.
+- **Final verification: PASS** — `npm test`.
+- **Focused check: PASS** — equivalent root spellings reuse one base; profiles remain isolated; per-call overlays do not persist. No test files added or changed.
+- **Unverified assumption:** normalization means lexical path resolution; symlink aliases were not tested.

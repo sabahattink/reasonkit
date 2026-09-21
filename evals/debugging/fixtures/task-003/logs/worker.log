@@ -1,0 +1,14 @@
+2026-09-10T09:14:02.101Z delivery=delivery-1001-a key=payment-1001 event=received attempt=1
+2026-09-10T09:14:02.104Z delivery=delivery-1001-a key=payment-1001 event=lookup result=miss
+2026-09-10T09:14:02.109Z delivery=delivery-1001-a key=payment-1001 event=effect_start
+2026-09-10T09:14:02.116Z delivery=delivery-1001-a key=payment-1001 event=effect_commit receipt=effect-1
+2026-09-10T09:14:02.118Z delivery=delivery-1001-a key=payment-1001 event=record_saved
+2026-09-10T09:14:02.119Z delivery=delivery-1001-a key=payment-1001 event=ack status=timeout
+2026-09-10T09:14:02.221Z delivery=delivery-1001-a key=payment-1001 event=received attempt=2
+2026-09-10T09:14:02.223Z delivery=delivery-1001-a key=payment-1001 event=lookup result=hit receipt=effect-1
+2026-09-10T09:14:02.224Z delivery=delivery-1001-a key=payment-1001 event=ack status=acked
+
+2026-09-10T11:42:17.400Z delivery=delivery-1002-a key=payment-1002 event=received attempt=1
+2026-09-10T11:42:17.402Z delivery=delivery-1002-a key=payment-1002 event=lookup result=miss
+2026-09-10T11:42:17.411Z delivery=delivery-1002-a key=payment-1002 event=effect_commit receipt=effect-2
+2026-09-10T11:42:17.413Z delivery=delivery-1002-a key=payment-1002 event=ack status=acked

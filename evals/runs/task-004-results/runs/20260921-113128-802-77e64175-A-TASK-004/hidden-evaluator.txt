@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: separates file-backed bases for different workspace roots
+ok 1 - separates file-backed bases for different workspace roots
+  ---
+  duration_ms: 2.998874
+  type: 'test'
+  ...
+# Subtest: normalizes equivalent workspace roots while retaining per-call overlays
+ok 2 - normalizes equivalent workspace roots while retaining per-call overlays
+  ---
+  duration_ms: 1.306983
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9.20058

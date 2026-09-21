@@ -1,0 +1,20 @@
+{
+  "run_id": "20260921-113557-340-c8f75f36-D-TASK-004",
+  "arm": "D",
+  "task_id": "TASK-004",
+  "provider_start_status": "STARTED",
+  "model_completion_status": "NOT_STARTED",
+  "public_verification_status": "NOT_RUN",
+  "hidden_evaluation_status": "NOT_RUN",
+  "start_epoch_seconds": 1789990557.655075,
+  "execution_commit": "a97b3a5e9d0af96044683807a16a7c9adba34c94",
+  "runner_checkout_commit": "b421793162e8795200438473805bc5278dba77de",
+  "provider_home": {
+    "path": "/home/sabah/reasonkit-bench/task-004-execution/evals/runs/task-004-results/runs/20260921-113557-340-c8f75f36-D-TASK-004/provider-home",
+    "copied_files": [
+      "auth.json",
+      "config.toml"
+    ],
+    "cache_seeded": false
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "input_tokens": 155471,
+  "cached_input_tokens": 137728,
+  "output_tokens": 2929,
+  "reasoning_tokens": 954,
+  "total_tokens": null,
+  "instruction_bytes": 1307,
+  "tool_calls": 15,
+  "agent_count": 0,
+  "task_success": true,
+  "verification_status": "PASS",
+  "notes": "Provider metrics are read from raw turn.completed usage; total_tokens remains null unless the provider supplied it.",
+  "duration_seconds": 48.169287663000034,
+  "diff_in_scope": null,
+  "scope_violation": false,
+  "tests_weakened": false,
+  "dependencies_changed": false,
+  "evaluator_validity": "VALID",
+  "failure_class": null,
+  "provider_status": "COMPLETED",
+  "model_completion_status": "COMPLETED",
+  "changed_files": [
+    "src/config-loader.js"
+  ],
+  "verification": {
+    "result": "NOT_RUN",
+    "evidence": []
+  },
+  "stop": {
+    "decision": "CONTINUE",
+    "reason": "Awaiting host and evaluator evidence."
+  },
+  "public_tests": "PASS",
+  "hidden_evaluation": {
+    "status": "PASS",
+    "exit_code": 0,
+    "duration_seconds": 0.02856088699996917,
+    "output_file": "hidden-evaluator.txt",
+    "evaluator_stage": "evaluator-stage/",
+    "hidden_script_sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+    "model_workspace_path": "evaluator-stage/model-workspace/"
+  },
+  "rubric_score": 3,
+  "public_exit_code": 0,
+  "hidden_exit_code": 0,
+  "evaluator_access_markers": [],
+  "specialist_authorization_count": 0,
+  "specialist_authorized_roles": [],
+  "actual_specialist_start_count": 0,
+  "actual_specialist_started_roles": [],
+  "adversarial_pass_count": 0,
+  "reasonkit_modules_loaded": [
+    {
+      "module_id": "protocol.debugging",
+      "module_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+      "module_bytes": 954,
+      "module_tokens": 200,
+      "load_reason": "route selected from TASK-004 debugging evidence",
+      "load_phase": "evidence",
+      "module_reuse": {
+        "reused": false,
+        "count": 0,
+        "scope": "none",
+        "reason": null
+      },
+      "load_action": "loaded",
+      "previous_sha256": null,
+      "reload_reason": null,
+      "context_injected": true,
+      "source_path": "protocols/debugging.md",
+      "candidate_role": "loadable_module"
+    }
+  ],
+  "reasonkit_modules_reused": [],
+  "full_bundle_loaded": false,
+  "prompt_identity": {
+    "arm": "C",
+    "task_sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+    "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+    "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+    "route_module_path": "protocols/debugging.md",
+    "route_module_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+    "route": "debugging",
+    "selected_complexity": "L2",
+    "full_bundle_fallback": false
+  },
+  "provider_exit_code": 0,
+  "provider_aborted": false
+}

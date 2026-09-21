@@ -1,0 +1,743 @@
+{
+  "schema_version": "task-004-post-run-integrity-1",
+  "repository_execution_commit": "a97b3a5e9d0af96044683807a16a7c9adba34c94",
+  "authoritative_head_actual": "a97b3a5e9d0af96044683807a16a7c9adba34c94",
+  "branch_actual": "v0.2-phase-0",
+  "runner_shadow": {
+    "path": "/home/sabah/reasonkit-bench/task-004-execution",
+    "source_commit": "b421793162e8795200438473805bc5278dba77de",
+    "purpose": "frozen runner source-commit binding; authoritative result identity remains a97b3a5e9d0af96044683807a16a7c9adba34c94"
+  },
+  "candidate": {
+    "manifest_file_sha256": "d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621",
+    "manifest_file_sha256_expected": "d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621",
+    "canonical_digest": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "canonical_digest_expected": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "covered_file_count": 55,
+    "covered_records": [
+      {
+        "path": "adapters/generic/SYSTEM.md",
+        "expected_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+        "actual_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+        "expected_bytes": 1450,
+        "actual_bytes": 1450,
+        "status": "PASS"
+      },
+      {
+        "path": "core/candidate-manifest.schema.json",
+        "expected_sha256": "d420da01f494d2606162bee3568288a5b40d96b9111609a46b196d5b7a38f30c",
+        "actual_sha256": "d420da01f494d2606162bee3568288a5b40d96b9111609a46b196d5b7a38f30c",
+        "expected_bytes": 2256,
+        "actual_bytes": 2256,
+        "status": "PASS"
+      },
+      {
+        "path": "core/computer-use-policy.md",
+        "expected_sha256": "59f95edbe7fd1e4ce0c51324334776979e033a31f9c7ab7b084f50670c5b0cda",
+        "actual_sha256": "59f95edbe7fd1e4ce0c51324334776979e033a31f9c7ab7b084f50670c5b0cda",
+        "expected_bytes": 1763,
+        "actual_bytes": 1763,
+        "status": "PASS"
+      },
+      {
+        "path": "core/module-registry.json",
+        "expected_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+        "actual_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+        "expected_bytes": 1680,
+        "actual_bytes": 1680,
+        "status": "PASS"
+      },
+      {
+        "path": "core/specialist-gate.md",
+        "expected_sha256": "209a78d885cae1c44287ece554cc7458e03a866ccde5b7fb05a2ce6aedd94914",
+        "actual_sha256": "209a78d885cae1c44287ece554cc7458e03a866ccde5b7fb05a2ce6aedd94914",
+        "expected_bytes": 4069,
+        "actual_bytes": 4069,
+        "status": "PASS"
+      },
+      {
+        "path": "core/telemetry.schema.json",
+        "expected_sha256": "be5f08ce84a21bf042469bd9b4ed43b2d2a3285a94611c2ae662a573c09315f8",
+        "actual_sha256": "be5f08ce84a21bf042469bd9b4ed43b2d2a3285a94611c2ae662a573c09315f8",
+        "expected_bytes": 17029,
+        "actual_bytes": 17029,
+        "status": "PASS"
+      },
+      {
+        "path": "core/tiny-kernel.md",
+        "expected_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "actual_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "expected_bytes": 1307,
+        "actual_bytes": 1307,
+        "status": "PASS"
+      },
+      {
+        "path": "dist/v0.2/reasonkit-kernel.md",
+        "expected_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "actual_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "expected_bytes": 1307,
+        "actual_bytes": 1307,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/benchmark-v0.2.json",
+        "expected_sha256": "274353d456828311f34eaaeccc3682edc70b37e2983689cccd8119beb8bb856b",
+        "actual_sha256": "274353d456828311f34eaaeccc3682edc70b37e2983689cccd8119beb8bb856b",
+        "expected_bytes": 10953,
+        "actual_bytes": 10953,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/acceptance.md",
+        "expected_sha256": "7f3da9a71c6b8f0011e4be19b80f954886c45e4574942a33cedce56d07ef9c61",
+        "actual_sha256": "7f3da9a71c6b8f0011e4be19b80f954886c45e4574942a33cedce56d07ef9c61",
+        "expected_bytes": 615,
+        "actual_bytes": 615,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/app/globals.css",
+        "expected_sha256": "ef4e25fb0e5a3b098081f726a3f07688d6e1dcb2376db9ab795a4f29a4b5ff7c",
+        "actual_sha256": "ef4e25fb0e5a3b098081f726a3f07688d6e1dcb2376db9ab795a4f29a4b5ff7c",
+        "expected_bytes": 1895,
+        "actual_bytes": 1895,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/app/layout.js",
+        "expected_sha256": "30cfd2233c6d992af2457af0cd68502c0db945346f0138307817e3e4d2164640",
+        "actual_sha256": "30cfd2233c6d992af2457af0cd68502c0db945346f0138307817e3e4d2164640",
+        "expected_bytes": 299,
+        "actual_bytes": 299,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/app/page.js",
+        "expected_sha256": "3ec1f718a29cdcd72be353792e8f8043d609bdc5ee7539b72ffd43dcbb18b554",
+        "actual_sha256": "3ec1f718a29cdcd72be353792e8f8043d609bdc5ee7539b72ffd43dcbb18b554",
+        "expected_bytes": 1010,
+        "actual_bytes": 1010,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/content.json",
+        "expected_sha256": "ac7b946d01bff5446b37d7fb902ac4b966059459040deddf4bf6629418dd2974",
+        "actual_sha256": "ac7b946d01bff5446b37d7fb902ac4b966059459040deddf4bf6629418dd2974",
+        "expected_bytes": 650,
+        "actual_bytes": 650,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/package.json",
+        "expected_sha256": "a9a227d5cdb5cab81627593cba9349348f255c7c963020fbb7d6458b81d52bff",
+        "actual_sha256": "a9a227d5cdb5cab81627593cba9349348f255c7c963020fbb7d6458b81d52bff",
+        "expected_bytes": 316,
+        "actual_bytes": 316,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/public/mark.svg",
+        "expected_sha256": "f8be72938910ac8ab57b520fe224cf0fc1d08b6bdaee18a098f4c0125f410b77",
+        "actual_sha256": "f8be72938910ac8ab57b520fe224cf0fc1d08b6bdaee18a098f4c0125f410b77",
+        "expected_bytes": 299,
+        "actual_bytes": 299,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/fixtures/task-002/public/README.md",
+        "expected_sha256": "2162065bdd57ccc241d62fccce6d2b590a01a6a8a2edfe5e75014db163c6e733",
+        "actual_sha256": "2162065bdd57ccc241d62fccce6d2b590a01a6a8a2edfe5e75014db163c6e733",
+        "expected_bytes": 148,
+        "actual_bytes": 148,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/creative/TASK-002.md",
+        "expected_sha256": "3c67e875f0628f1b34d734653862119d0a9b4502ed66672cca133f848ef2d2a2",
+        "actual_sha256": "3c67e875f0628f1b34d734653862119d0a9b4502ed66672cca133f848ef2d2a2",
+        "expected_bytes": 2275,
+        "actual_bytes": 2275,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js",
+        "expected_sha256": "fa0c9b0e62be6a5c3b1d60c0878730be4d2ceb62a641a715444951604708edef",
+        "actual_sha256": "fa0c9b0e62be6a5c3b1d60c0878730be4d2ceb62a641a715444951604708edef",
+        "expected_bytes": 2025,
+        "actual_bytes": 2025,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/idempotency.js",
+        "expected_sha256": "f7459aed8bdb1d9554de2b74793757dad58264d74df5bed3475c25ac1d86798e",
+        "actual_sha256": "f7459aed8bdb1d9554de2b74793757dad58264d74df5bed3475c25ac1d86798e",
+        "expected_bytes": 646,
+        "actual_bytes": 646,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/queue.js",
+        "expected_sha256": "cd6eae0d6698999dc6c056bdaf3fcf8ea90b0e6749af79717ba43726e75d6135",
+        "actual_sha256": "cd6eae0d6698999dc6c056bdaf3fcf8ea90b0e6749af79717ba43726e75d6135",
+        "expected_bytes": 1226,
+        "actual_bytes": 1226,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/repository.js",
+        "expected_sha256": "c979f5c6f1014fcd7a6725c2d96ffe2b046500d2f8367fccc6665f097d34a69e",
+        "actual_sha256": "c979f5c6f1014fcd7a6725c2d96ffe2b046500d2f8367fccc6665f097d34a69e",
+        "expected_bytes": 767,
+        "actual_bytes": 767,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/transaction.js",
+        "expected_sha256": "082cf82902dbea83560bd68585e6a01d9367736015ce91da63540d4bf33f0085",
+        "actual_sha256": "082cf82902dbea83560bd68585e6a01d9367736015ce91da63540d4bf33f0085",
+        "expected_bytes": 594,
+        "actual_bytes": 594,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/worker.js",
+        "expected_sha256": "23cb14af7dc31baeec6f3730eb019a362ad82c80b6d3cf315c0786c2c6951117",
+        "actual_sha256": "23cb14af7dc31baeec6f3730eb019a362ad82c80b6d3cf315c0786c2c6951117",
+        "expected_bytes": 1381,
+        "actual_bytes": 1381,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1",
+        "expected_sha256": "be84d8fff21e302fcd6d76dfd1cf02c5886a155d5bd8f0e8c9128366dc7b47b1",
+        "actual_sha256": "be84d8fff21e302fcd6d76dfd1cf02c5886a155d5bd8f0e8c9128366dc7b47b1",
+        "expected_bytes": 969,
+        "actual_bytes": 969,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-001/parser.js",
+        "expected_sha256": "b5904d98c0236d3aa0f2530dda970d7df53b2d28ed5c2218716a184ada9ab4ad",
+        "actual_sha256": "b5904d98c0236d3aa0f2530dda970d7df53b2d28ed5c2218716a184ada9ab4ad",
+        "expected_bytes": 383,
+        "actual_bytes": 383,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-001/parser.test.js",
+        "expected_sha256": "ff720ce4ae79df831e36b1d520749dba2502711e4d84eb4b077c8d7359f66cd2",
+        "actual_sha256": "ff720ce4ae79df831e36b1d520749dba2502711e4d84eb4b077c8d7359f66cd2",
+        "expected_bytes": 490,
+        "actual_bytes": 490,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/fixtures/jobs.json",
+        "expected_sha256": "4764b9b94c77f57938a7e7e240e57a0346d16532bb3b41c45b9bc5754ad18f21",
+        "actual_sha256": "4764b9b94c77f57938a7e7e240e57a0346d16532bb3b41c45b9bc5754ad18f21",
+        "expected_bytes": 286,
+        "actual_bytes": 286,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/logs/README.md",
+        "expected_sha256": "a34acae3bb17305890258fa86661c6cdfaae5a1db84b774f907f8183f0163229",
+        "actual_sha256": "a34acae3bb17305890258fa86661c6cdfaae5a1db84b774f907f8183f0163229",
+        "expected_bytes": 353,
+        "actual_bytes": 353,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/logs/retry.log",
+        "expected_sha256": "65334d529451a89a44eff788e3d89e96624aef080f67b9e6b1a6c1e535499686",
+        "actual_sha256": "65334d529451a89a44eff788e3d89e96624aef080f67b9e6b1a6c1e535499686",
+        "expected_bytes": 347,
+        "actual_bytes": 347,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/logs/worker.log",
+        "expected_sha256": "3f9ba176dc12dd171cf01ca0a9b49c654c35f02b714c135eddf08453d9ee7655",
+        "actual_sha256": "3f9ba176dc12dd171cf01ca0a9b49c654c35f02b714c135eddf08453d9ee7655",
+        "expected_bytes": 1221,
+        "actual_bytes": 1221,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/package.json",
+        "expected_sha256": "1508d475494d01d9f04ee4855e2fc479fe4ea03b55c0c111c8fedcf61e6da4c3",
+        "actual_sha256": "1508d475494d01d9f04ee4855e2fc479fe4ea03b55c0c111c8fedcf61e6da4c3",
+        "expected_bytes": 213,
+        "actual_bytes": 213,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/src/idempotency.js",
+        "expected_sha256": "b9cc9a5deb096a31e9d1d4e4cc51dd2e82ba99c1fe4b9fb4bfbe348cfc3e0152",
+        "actual_sha256": "b9cc9a5deb096a31e9d1d4e4cc51dd2e82ba99c1fe4b9fb4bfbe348cfc3e0152",
+        "expected_bytes": 426,
+        "actual_bytes": 426,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/src/queue.js",
+        "expected_sha256": "d6ea7dc08aa149cfd32de277fc3b2a36ffd8ed73c7ea09501db55342c93a66e9",
+        "actual_sha256": "d6ea7dc08aa149cfd32de277fc3b2a36ffd8ed73c7ea09501db55342c93a66e9",
+        "expected_bytes": 1230,
+        "actual_bytes": 1230,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/src/repository.js",
+        "expected_sha256": "1b4c43c56b952f9a0ce3a55d87100bc509222b83a93307a636d606811b1e72d6",
+        "actual_sha256": "1b4c43c56b952f9a0ce3a55d87100bc509222b83a93307a636d606811b1e72d6",
+        "expected_bytes": 789,
+        "actual_bytes": 789,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/src/transaction.js",
+        "expected_sha256": "082cf82902dbea83560bd68585e6a01d9367736015ce91da63540d4bf33f0085",
+        "actual_sha256": "082cf82902dbea83560bd68585e6a01d9367736015ce91da63540d4bf33f0085",
+        "expected_bytes": 594,
+        "actual_bytes": 594,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/src/worker.js",
+        "expected_sha256": "59785faf7aed22cdd398812b11a587f5f45046edf7f8967913cfef4af4541502",
+        "actual_sha256": "59785faf7aed22cdd398812b11a587f5f45046edf7f8967913cfef4af4541502",
+        "expected_bytes": 1134,
+        "actual_bytes": 1134,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/tests/concurrency.test.js",
+        "expected_sha256": "7b4316cf3abe4388ccadbf4c5075df9fe58032df7ca42737d6be950231a83dd0",
+        "actual_sha256": "7b4316cf3abe4388ccadbf4c5075df9fe58032df7ca42737d6be950231a83dd0",
+        "expected_bytes": 1069,
+        "actual_bytes": 1069,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/tests/retry.test.js",
+        "expected_sha256": "19eb0058fd78e2bb881953beed252fbae0f2e5741eb3e54349c223b9d4259285",
+        "actual_sha256": "19eb0058fd78e2bb881953beed252fbae0f2e5741eb3e54349c223b9d4259285",
+        "expected_bytes": 1063,
+        "actual_bytes": 1063,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/fixtures/task-003/tests/worker.test.js",
+        "expected_sha256": "4c74a1ab0e58d670cd264f012aff172ef13f288c0c8a2dd4b658531a0e87d8fe",
+        "actual_sha256": "4c74a1ab0e58d670cd264f012aff172ef13f288c0c8a2dd4b658531a0e87d8fe",
+        "expected_bytes": 1171,
+        "actual_bytes": 1171,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/TASK-001.md",
+        "expected_sha256": "e857532205e543bbfb2585035c7b6cfe164b08b4aba4f958b5308f6f5fb6756a",
+        "actual_sha256": "e857532205e543bbfb2585035c7b6cfe164b08b4aba4f958b5308f6f5fb6756a",
+        "expected_bytes": 1336,
+        "actual_bytes": 1336,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/TASK-003.acceptance.md",
+        "expected_sha256": "4ee526a7f9ce1c50853dbc739cfae909fb9c30d65ade6d30628dad8d32b4bcce",
+        "actual_sha256": "4ee526a7f9ce1c50853dbc739cfae909fb9c30d65ade6d30628dad8d32b4bcce",
+        "expected_bytes": 1243,
+        "actual_bytes": 1243,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/debugging/TASK-003.md",
+        "expected_sha256": "3da482fa15a8ef0a15b997a8f48009fc52d38324fb983ce6866d48b8da0f2fce",
+        "actual_sha256": "3da482fa15a8ef0a15b997a8f48009fc52d38324fb983ce6866d48b8da0f2fce",
+        "expected_bytes": 1308,
+        "actual_bytes": 1308,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/architecture.md",
+        "expected_sha256": "2077081286fc638c9db54c1f0c8afe77e798b00b09f564799052ea5ff16640f2",
+        "actual_sha256": "2077081286fc638c9db54c1f0c8afe77e798b00b09f564799052ea5ff16640f2",
+        "expected_bytes": 1050,
+        "actual_bytes": 1050,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/coding.md",
+        "expected_sha256": "6bba9439fe3a4c0e24a3a22bd379e53ea164f4fa74f9d2309bd9fc79c38cc01b",
+        "actual_sha256": "6bba9439fe3a4c0e24a3a22bd379e53ea164f4fa74f9d2309bd9fc79c38cc01b",
+        "expected_bytes": 880,
+        "actual_bytes": 880,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/computer-use.md",
+        "expected_sha256": "bef03d45499330183d49739356f37101a77961e7743fd31c07fb9a8ebd3092b9",
+        "actual_sha256": "bef03d45499330183d49739356f37101a77961e7743fd31c07fb9a8ebd3092b9",
+        "expected_bytes": 909,
+        "actual_bytes": 909,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/debugging.md",
+        "expected_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+        "actual_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+        "expected_bytes": 954,
+        "actual_bytes": 954,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/design.md",
+        "expected_sha256": "f319108a6cfd60f5b5e8c862d32d57f37cc21268d84b280c72b1569b94c09bba",
+        "actual_sha256": "f319108a6cfd60f5b5e8c862d32d57f37cc21268d84b280c72b1569b94c09bba",
+        "expected_bytes": 1248,
+        "actual_bytes": 1248,
+        "status": "PASS"
+      },
+      {
+        "path": "protocols/research.md",
+        "expected_sha256": "1f8bb6d755c78d390a25c075c1035688c87584f7914ceb6b584931d66b018bb9",
+        "actual_sha256": "1f8bb6d755c78d390a25c075c1035688c87584f7914ceb6b584931d66b018bb9",
+        "expected_bytes": 918,
+        "actual_bytes": 918,
+        "status": "PASS"
+      },
+      {
+        "path": "scripts/reasonkit-v02.psm1",
+        "expected_sha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+        "actual_sha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+        "expected_bytes": 85598,
+        "actual_bytes": 85598,
+        "status": "PASS"
+      },
+      {
+        "path": "scripts/run-benchmark.ps1",
+        "expected_sha256": "22afbd5791612174a21e4aa23dfe880e8e29a3f79def696d0fc89f14ece7de24",
+        "actual_sha256": "22afbd5791612174a21e4aa23dfe880e8e29a3f79def696d0fc89f14ece7de24",
+        "expected_bytes": 42527,
+        "actual_bytes": 42527,
+        "status": "PASS"
+      },
+      {
+        "path": "scripts/test-phase6.ps1",
+        "expected_sha256": "06ba5a95efc07ddef1a62fd881914b1151d921e0a666c3fc849e0a8558ac1117",
+        "actual_sha256": "06ba5a95efc07ddef1a62fd881914b1151d921e0a666c3fc849e0a8558ac1117",
+        "expected_bytes": 24808,
+        "actual_bytes": 24808,
+        "status": "PASS"
+      },
+      {
+        "path": "scripts/test-v02.ps1",
+        "expected_sha256": "82843fad7c9c77d9fc6af29efece48799912fa23e0d5493a6aad4d8c4a8186d0",
+        "actual_sha256": "82843fad7c9c77d9fc6af29efece48799912fa23e0d5493a6aad4d8c4a8186d0",
+        "expected_bytes": 110499,
+        "actual_bytes": 110499,
+        "status": "PASS"
+      },
+      {
+        "path": "scripts/validate.ps1",
+        "expected_sha256": "0e9aa70a806606e836668e0957dc0a8cd420b91ac6e3bf8a44b307ff604ed8ae",
+        "actual_sha256": "0e9aa70a806606e836668e0957dc0a8cd420b91ac6e3bf8a44b307ff604ed8ae",
+        "expected_bytes": 8036,
+        "actual_bytes": 8036,
+        "status": "PASS"
+      },
+      {
+        "path": "taste/anti-generic.md",
+        "expected_sha256": "a0f95fe42f2dfd1cd7d2849d9b4bfdc48ecb4b643d4d0b151acf0cc38d44c30b",
+        "actual_sha256": "a0f95fe42f2dfd1cd7d2849d9b4bfdc48ecb4b643d4d0b151acf0cc38d44c30b",
+        "expected_bytes": 1976,
+        "actual_bytes": 1976,
+        "status": "PASS"
+      }
+    ],
+    "covered_paths_changed_since_freeze": [],
+    "status": "PASS"
+  },
+  "task_004": {
+    "freeze_manifest_sha256": "52ea13454a103ae441a7cf2a96600f35b64838513c00bbee35b103d1fe4b7c40",
+    "freeze_manifest_sha256_expected": "52ea13454a103ae441a7cf2a96600f35b64838513c00bbee35b103d1fe4b7c40",
+    "manifest_entry_count": 27,
+    "normative_file_count": 28,
+    "manifest_records": [
+      {
+        "path": "evals/runs/task-004-authoring/acceptance.md",
+        "expected_sha256": "bad9097b337bc18b5ae37c3f1a83f00fa530a61006050f859bb756806463e214",
+        "actual_sha256": "bad9097b337bc18b5ae37c3f1a83f00fa530a61006050f859bb756806463e214",
+        "expected_bytes": 1405,
+        "actual_bytes": 1405,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/evaluator-only/hidden-regression.js",
+        "expected_sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+        "actual_sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+        "expected_bytes": 2324,
+        "actual_bytes": 2324,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/evaluator-only/naive-fixed/src/config-loader.js",
+        "expected_sha256": "c79d39bb5666ea9a9dfd2158d284476ee2f089dcf5e2dbaa2fc3855f9864d311",
+        "actual_sha256": "c79d39bb5666ea9a9dfd2158d284476ee2f089dcf5e2dbaa2fc3855f9864d311",
+        "expected_bytes": 987,
+        "actual_bytes": 987,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/evaluator-only/README.md",
+        "expected_sha256": "5e7f76084983c2ec180cc8fc6f33daa96c67ab17c0269c37f160af6a59adb4e1",
+        "actual_sha256": "5e7f76084983c2ec180cc8fc6f33daa96c67ab17c0269c37f160af6a59adb4e1",
+        "expected_bytes": 380,
+        "actual_bytes": 380,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/evaluator-only/reference-fixed/src/config-loader.js",
+        "expected_sha256": "9a0e2a640790c1a2be6d86aa847bd5f46fe812ecbde16131dccfc0a74191d49d",
+        "actual_sha256": "9a0e2a640790c1a2be6d86aa847bd5f46fe812ecbde16131dccfc0a74191d49d",
+        "expected_bytes": 992,
+        "actual_bytes": 992,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/evaluator-only/verify-task-004.ps1",
+        "expected_sha256": "3543f10c58b9de45a895ee96f6301ed3dd67c35ca7426b97f2cc35d163d4dea0",
+        "actual_sha256": "3543f10c58b9de45a895ee96f6301ed3dd67c35ca7426b97f2cc35d163d4dea0",
+        "expected_bytes": 7633,
+        "actual_bytes": 7633,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/notes/incident.md",
+        "expected_sha256": "8800ce3d41d3028dab960dd29c6df0d417920dda5d7542cd394cfa1e6a123d48",
+        "actual_sha256": "8800ce3d41d3028dab960dd29c6df0d417920dda5d7542cd394cfa1e6a123d48",
+        "expected_bytes": 450,
+        "actual_bytes": 450,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/package.json",
+        "expected_sha256": "25976ede81d13265fbb9b6a113a218bc9d6da1a899254dec8ff6898a78337e31",
+        "actual_sha256": "25976ede81d13265fbb9b6a113a218bc9d6da1a899254dec8ff6898a78337e31",
+        "expected_bytes": 196,
+        "actual_bytes": 196,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/README.md",
+        "expected_sha256": "c1af3297b16b0403d547ec993d9b2716cc6c367b3c52737967170332fd7114ec",
+        "actual_sha256": "c1af3297b16b0403d547ec993d9b2716cc6c367b3c52737967170332fd7114ec",
+        "expected_bytes": 548,
+        "actual_bytes": 548,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/config-cache.js",
+        "expected_sha256": "9e703b7a031a76a190e244cf9cd6dc08a88c2bbdbcdd1b01a34252e3153bc9f7",
+        "actual_sha256": "9e703b7a031a76a190e244cf9cd6dc08a88c2bbdbcdd1b01a34252e3153bc9f7",
+        "expected_bytes": 349,
+        "actual_bytes": 349,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/config-loader.js",
+        "expected_sha256": "dff23e9a7e7657a9dd82f5185b59337d2d13976eb6129c20cca137c44543330a",
+        "actual_sha256": "dff23e9a7e7657a9dd82f5185b59337d2d13976eb6129c20cca137c44543330a",
+        "expected_bytes": 970,
+        "actual_bytes": 970,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/default-config.js",
+        "expected_sha256": "8d1d0538597c8a2470ebb94d67f300d6d3ee7728d7e3b33abb22ecb30185e8d3",
+        "actual_sha256": "8d1d0538597c8a2470ebb94d67f300d6d3ee7728d7e3b33abb22ecb30185e8d3",
+        "expected_bytes": 181,
+        "actual_bytes": 181,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/diagnostics.js",
+        "expected_sha256": "37cae0c3afba472fc119c614246454df45c1f8f65fc8b9e99e1dcf61d42ceeec",
+        "actual_sha256": "37cae0c3afba472fc119c614246454df45c1f8f65fc8b9e99e1dcf61d42ceeec",
+        "expected_bytes": 129,
+        "actual_bytes": 129,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/env-overrides.js",
+        "expected_sha256": "052504507f020b1bedfe0186d7c319dab5ca2681e4890d7d830094e038b30751",
+        "actual_sha256": "052504507f020b1bedfe0186d7c319dab5ca2681e4890d7d830094e038b30751",
+        "expected_bytes": 766,
+        "actual_bytes": 766,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/src/profile-source.js",
+        "expected_sha256": "54563053c4b25de37f694b93429896186d297816f4be6148f72661611070fd6a",
+        "actual_sha256": "54563053c4b25de37f694b93429896186d297816f4be6148f72661611070fd6a",
+        "expected_bytes": 290,
+        "actual_bytes": 290,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/tests/config-loader.test.js",
+        "expected_sha256": "5bf52f51f6edf043b74f87b6b6c440927de2026239580c3c108579b5c707a6c3",
+        "actual_sha256": "5bf52f51f6edf043b74f87b6b6c440927de2026239580c3c108579b5c707a6c3",
+        "expected_bytes": 2071,
+        "actual_bytes": 2071,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/workspaces/alpha/config/development.json",
+        "expected_sha256": "c5c4f21834d7078793a413cfbe1a9e865b5375eb08c872cbb65adce996abcd1e",
+        "actual_sha256": "c5c4f21834d7078793a413cfbe1a9e865b5375eb08c872cbb65adce996abcd1e",
+        "expected_bytes": 96,
+        "actual_bytes": 96,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/workspaces/beta/config/development.json",
+        "expected_sha256": "f626864bf693c6e175dfc93c7fcbb56fca79fa490b1ef0b42969c30138dd55ff",
+        "actual_sha256": "f626864bf693c6e175dfc93c7fcbb56fca79fa490b1ef0b42969c30138dd55ff",
+        "expected_bytes": 92,
+        "actual_bytes": 92,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/fixture-public/workspaces/gamma/config/development.json",
+        "expected_sha256": "17c18d3e571f06064231d54c6da136aedc6e076146b239d2014e49a2c55caa97",
+        "actual_sha256": "17c18d3e571f06064231d54c6da136aedc6e076146b239d2014e49a2c55caa97",
+        "expected_bytes": 97,
+        "actual_bytes": 97,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/freeze/BASELINE-VALIDATION.json",
+        "expected_sha256": "3914b3995e94f524d366d3e1cdab8c9c2155c8173a610eccf4daa0e7ecfd9789",
+        "actual_sha256": "3914b3995e94f524d366d3e1cdab8c9c2155c8173a610eccf4daa0e7ecfd9789",
+        "expected_bytes": 1772,
+        "actual_bytes": 1772,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/freeze/FREEZE-RECORD.md",
+        "expected_sha256": "61e68dc2599302a5dd7eb801eeca51d6080abc1adb13150da794549c79f76e59",
+        "actual_sha256": "61e68dc2599302a5dd7eb801eeca51d6080abc1adb13150da794549c79f76e59",
+        "expected_bytes": 2089,
+        "actual_bytes": 2089,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/README.md",
+        "expected_sha256": "baf909151455e5d41b847585f4ebd9b736b9d8bfec08c5b1e765a9c9e08805d8",
+        "actual_sha256": "baf909151455e5d41b847585f4ebd9b736b9d8bfec08c5b1e765a9c9e08805d8",
+        "expected_bytes": 939,
+        "actual_bytes": 939,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/rubric.md",
+        "expected_sha256": "b51fd109a82d6604044cfee46c949fb64f54dd9656a07c363e238a73664bf483",
+        "actual_sha256": "b51fd109a82d6604044cfee46c949fb64f54dd9656a07c363e238a73664bf483",
+        "expected_bytes": 1306,
+        "actual_bytes": 1306,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/run-order.md",
+        "expected_sha256": "fb1702ea3a809efeef5a2b602644f852dce598c681d6870364a5e84195c77288",
+        "actual_sha256": "fb1702ea3a809efeef5a2b602644f852dce598c681d6870364a5e84195c77288",
+        "expected_bytes": 1009,
+        "actual_bytes": 1009,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/TASK-004-PROTOCOL.md",
+        "expected_sha256": "25fe32dec0a8c1644d6f3cf791a33ac4d1cfbc8e7b0c46e5ded1fa14e726a7a8",
+        "actual_sha256": "25fe32dec0a8c1644d6f3cf791a33ac4d1cfbc8e7b0c46e5ded1fa14e726a7a8",
+        "expected_bytes": 1642,
+        "actual_bytes": 1642,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/task.md",
+        "expected_sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+        "actual_sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+        "expected_bytes": 2230,
+        "actual_bytes": 2230,
+        "status": "PASS"
+      },
+      {
+        "path": "evals/runs/task-004-authoring/validity-rules.md",
+        "expected_sha256": "33aebeb457831c3852bc0b9dd2fbffd2c43be5709c423ea03c0cdfb9694bbc0b",
+        "actual_sha256": "33aebeb457831c3852bc0b9dd2fbffd2c43be5709c423ea03c0cdfb9694bbc0b",
+        "expected_bytes": 1328,
+        "actual_bytes": 1328,
+        "status": "PASS"
+      }
+    ],
+    "package_paths": [
+      "evals/runs/task-004-authoring/README.md",
+      "evals/runs/task-004-authoring/TASK-004-PROTOCOL.md",
+      "evals/runs/task-004-authoring/acceptance.md",
+      "evals/runs/task-004-authoring/evaluator-only/README.md",
+      "evals/runs/task-004-authoring/evaluator-only/hidden-regression.js",
+      "evals/runs/task-004-authoring/evaluator-only/naive-fixed/src/config-loader.js",
+      "evals/runs/task-004-authoring/evaluator-only/reference-fixed/src/config-loader.js",
+      "evals/runs/task-004-authoring/evaluator-only/verify-task-004.ps1",
+      "evals/runs/task-004-authoring/fixture-public/README.md",
+      "evals/runs/task-004-authoring/fixture-public/notes/incident.md",
+      "evals/runs/task-004-authoring/fixture-public/package.json",
+      "evals/runs/task-004-authoring/fixture-public/src/config-cache.js",
+      "evals/runs/task-004-authoring/fixture-public/src/config-loader.js",
+      "evals/runs/task-004-authoring/fixture-public/src/default-config.js",
+      "evals/runs/task-004-authoring/fixture-public/src/diagnostics.js",
+      "evals/runs/task-004-authoring/fixture-public/src/env-overrides.js",
+      "evals/runs/task-004-authoring/fixture-public/src/profile-source.js",
+      "evals/runs/task-004-authoring/fixture-public/tests/config-loader.test.js",
+      "evals/runs/task-004-authoring/fixture-public/workspaces/alpha/config/development.json",
+      "evals/runs/task-004-authoring/fixture-public/workspaces/beta/config/development.json",
+      "evals/runs/task-004-authoring/fixture-public/workspaces/gamma/config/development.json",
+      "evals/runs/task-004-authoring/freeze/BASELINE-VALIDATION.json",
+      "evals/runs/task-004-authoring/freeze/FREEZE-MANIFEST.json",
+      "evals/runs/task-004-authoring/freeze/FREEZE-RECORD.md",
+      "evals/runs/task-004-authoring/rubric.md",
+      "evals/runs/task-004-authoring/run-order.md",
+      "evals/runs/task-004-authoring/task.md",
+      "evals/runs/task-004-authoring/validity-rules.md"
+    ],
+    "status": "PASS"
+  },
+  "build_checks": {
+    "base_dist": {
+      "status": "PASS",
+      "observed_output": "dist check passed"
+    },
+    "v02_kernel": {
+      "status": "PASS",
+      "sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+      "bytes": 1307,
+      "tokens": 247
+    },
+    "v02_registry": {
+      "status": "PASS",
+      "sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+      "bytes": 1680,
+      "tokens": 420
+    }
+  },
+  "remote": {
+    "head": "a97b3a5e9d0af96044683807a16a7c9adba34c94",
+    "expected": "a97b3a5e9d0af96044683807a16a7c9adba34c94",
+    "aligned": true
+  },
+  "diff_check_exit_code": 0,
+  "result_path_outside_frozen_inputs": true,
+  "overall": "PASS"
+}

@@ -32,6 +32,8 @@ try {
     'adapters/generic/SYSTEM.md',
     'evals/arms/reliable-engineering-v0.1.md',
     'evals/benchmark.json',
+    'evals/benchmark-v0.2.json',
+    'dist/v0.2/candidate-manifest.json',
     'evals/debugging/TASK-001.md',
     'evals/debugging/fixtures/task-001/parser.js',
     'evals/debugging/fixtures/task-001/parser.test.js',
@@ -44,8 +46,22 @@ try {
     'evals/creative/fixtures/task-002/public/mark.svg',
     'evals/creative/fixtures/task-002/public/README.md',
     'evals/creative/fixtures/task-002/acceptance.md',
+    'evals/debugging/TASK-003.md',
+    'evals/debugging/TASK-003.acceptance.md',
+    'evals/debugging/fixtures/task-003/package.json',
+    'evals/debugging/fixtures/task-003/src/worker.js',
+    'evals/debugging/fixtures/task-003/tests/worker.test.js',
+    'evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js',
+    'evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1',
+    'evals/debugging/evaluator-only/TASK-003/reference-fixed/src/worker.js',
+    'docs/REASONKIT-V0.2-DESIGN-RESEARCH-SPEC.md',
+    'core/telemetry.schema.json',
+    'core/candidate-manifest.schema.json',
+    'core/tiny-kernel.md',
+    'dist/v0.2/reasonkit-kernel.md',
     'scripts/build-dist.ps1',
-    'scripts/run-benchmark.ps1'
+    'scripts/run-benchmark.ps1',
+    'scripts/test-v02.ps1'
   )
 
   function Resolve-PreparedRun {
@@ -77,7 +93,8 @@ try {
 
   $contentFiles = Get-ChildItem -Recurse -File | Where-Object {
     $_.FullName -notmatch '\\.git\\' -and
-    $_.FullName -notmatch '\\evals\\runs\\'
+    $_.FullName -notmatch '\\evals\\runs\\' -and
+    $_.FullName -notmatch '[\\/]docs[\\/]REASONKIT-V0.2-DESIGN-RESEARCH-SPEC\.md$'
   }
   foreach ($file in $contentFiles) {
     $content = [IO.File]::ReadAllText($file.FullName)
@@ -137,6 +154,11 @@ try {
     throw 'Generated distribution is stale.'
   }
 
+  & .\scripts\build-dist.ps1 -V02Kernel -Check
+  if (-not $?) {
+    throw 'Generated v0.2 Tiny Kernel is stale.'
+  }
+
   $null = @(
     & node 'evals/debugging/fixtures/task-001/parser.test.js' 2>&1 |
       ForEach-Object { $_.ToString() }
@@ -184,6 +206,16 @@ try {
         $null -eq $metadata.fixture_sha256) {
       throw 'Run metadata is missing instruction or fixture provenance.'
     }
+  }
+
+  & .\scripts\test-v02.ps1
+  if (-not $?) {
+    throw 'Phase 0 v0.2 synthetic tests failed.'
+  }
+
+  & .\scripts\test-phase6.ps1 -RequireFinalCandidate
+  if (-not $?) {
+    throw 'Phase 6 provenance and binding tests failed.'
   }
 
   $global:LASTEXITCODE = 0

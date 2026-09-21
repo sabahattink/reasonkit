@@ -1,0 +1,61 @@
+{
+  "input_tokens": 161060,
+  "cached_input_tokens": 146688,
+  "output_tokens": 3065,
+  "reasoning_tokens": 996,
+  "total_tokens": null,
+  "instruction_bytes": 0,
+  "tool_calls": 9,
+  "agent_count": 0,
+  "task_success": true,
+  "verification_status": "PASS",
+  "notes": "Provider metrics are read from raw turn.completed usage; total_tokens remains null unless the provider supplied it.",
+  "duration_seconds": 48.48380849,
+  "diff_in_scope": null,
+  "scope_violation": false,
+  "tests_weakened": false,
+  "dependencies_changed": false,
+  "evaluator_validity": "VALID",
+  "failure_class": null,
+  "provider_status": "COMPLETED",
+  "model_completion_status": "COMPLETED",
+  "changed_files": [
+    "src/config-loader.js"
+  ],
+  "verification": {
+    "result": "NOT_RUN",
+    "evidence": []
+  },
+  "stop": {
+    "decision": "CONTINUE",
+    "reason": "Awaiting host and evaluator evidence."
+  },
+  "public_tests": "PASS",
+  "hidden_evaluation": {
+    "status": "PASS",
+    "exit_code": 0,
+    "duration_seconds": 0.03036493999999834,
+    "output_file": "hidden-evaluator.txt",
+    "evaluator_stage": "evaluator-stage/",
+    "hidden_script_sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+    "model_workspace_path": "evaluator-stage/model-workspace/"
+  },
+  "rubric_score": 3,
+  "public_exit_code": 0,
+  "hidden_exit_code": 0,
+  "evaluator_access_markers": [],
+  "specialist_authorization_count": null,
+  "specialist_authorized_roles": [],
+  "actual_specialist_start_count": null,
+  "actual_specialist_started_roles": [],
+  "adversarial_pass_count": null,
+  "reasonkit_modules_loaded": [],
+  "reasonkit_modules_reused": [],
+  "full_bundle_loaded": null,
+  "prompt_identity": {
+    "arm": "A",
+    "task_sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a"
+  },
+  "provider_exit_code": 0,
+  "provider_aborted": false
+}

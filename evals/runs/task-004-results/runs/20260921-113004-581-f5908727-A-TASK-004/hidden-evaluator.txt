@@ -1,0 +1,42 @@
+TAP version 13
+# Subtest: separates file-backed bases for different workspace roots
+not ok 1 - separates file-backed bases for different workspace roots
+  ---
+  duration_ms: 3.055799
+  type: 'test'
+  location: '/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113004-581-f5908727-A-TASK-004/evaluator-stage/evaluator-only/hidden-regression.js:21:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'alpha-api'
+    - 'beta-api'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'beta-api'
+  actual: 'alpha-api'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113004-581-f5908727-A-TASK-004/evaluator-stage/evaluator-only/hidden-regression.js:30:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: normalizes equivalent workspace roots while retaining per-call overlays
+ok 2 - normalizes equivalent workspace roots while retaining per-call overlays
+  ---
+  duration_ms: 0.752766
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8.656722

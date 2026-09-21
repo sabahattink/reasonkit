@@ -1,0 +1,11 @@
+{
+  "arm": "C",
+  "task_sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+  "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+  "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+  "route_module_path": "protocols/debugging.md",
+  "route_module_sha256": "de15149fc362bc1b66ddb354a1a36be1853ed504b80e2ba4f5ff2d5fa7f4b766",
+  "route": "debugging",
+  "selected_complexity": "L2",
+  "full_bundle_fallback": false
+}

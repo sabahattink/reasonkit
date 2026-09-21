@@ -1,0 +1,19 @@
+--- a/src/config-loader.js
++++ b/src/config-loader.js
+@@ -1,5 +1,6 @@
+ 'use strict';
+ 
++const path = require('node:path');
+ const { DEFAULT_CONFIG } = require('./default-config');
+ const { ConfigCache } = require('./config-cache');
+ const { parseEnv } = require('./env-overrides');
+@@ -11,8 +12,7 @@
+       throw new Error('rootDir is required');
+     }
+ 
+-    // BUG: profile alone is not a stable identity when multiple workspaces share a cache.
+-    const cacheKey = profile;
++    const cacheKey = JSON.stringify([path.resolve(rootDir), profile]);
+     let base = cache.get(cacheKey);
+ 
+     if (base === undefined) {

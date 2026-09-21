@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.2",
+  "plan_type": "context-plan",
+  "task_id": "TASK-004",
+  "arm_id": "B",
+  "instruction_sha256": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+  "instruction_bytes": 1123,
+  "kernel_sha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+  "module_manifest_sha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+  "adapter_sha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+  "binding": null,
+  "route": null,
+  "selected_complexity": null,
+  "modules_loaded": [],
+  "status": "PENDING_HOST_EVIDENCE"
+}

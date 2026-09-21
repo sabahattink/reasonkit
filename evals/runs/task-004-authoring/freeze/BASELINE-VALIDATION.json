@@ -1,0 +1,47 @@
+{
+  "task_id": "TASK-004",
+  "validation_version": 1,
+  "fixture": "fixture-public",
+  "reasonkit_candidate_used": false,
+  "commands": {
+    "public": "node --test",
+    "hidden": "node evaluator-only/hidden-regression.js <fixture-root>",
+    "reference_public": "node --test",
+    "reference_hidden": "node evaluator-only/hidden-regression.js <reference-root>",
+    "incomplete_public": "node --test",
+    "incomplete_hidden": "node evaluator-only/hidden-regression.js <incomplete-root>"
+  },
+  "public_baseline": {
+    "result": "INTENTIONAL_FAIL",
+    "exit_codes": [1, 1],
+    "intended_defect_observed": true
+  },
+  "hidden_baseline": {
+    "result": "INTENTIONAL_FAIL",
+    "exit_codes": [1, 1],
+    "intended_defect_observed": true
+  },
+  "reference_fix": {
+    "public_exit_codes": [0, 0],
+    "hidden_exit_codes": [0, 0],
+    "result": "PASS"
+  },
+  "incomplete_fix_sensitivity": {
+    "public_exit_codes": [0, 0],
+    "hidden_exit_codes": [1, 1],
+    "result": "PASS",
+    "interpretation": "A plausible root-plus-profile key fixes public workspace isolation but fails equivalent-root normalization and cache-reuse regression."
+  },
+  "determinism": {
+    "result": "PASS",
+    "repeated_outcomes_match": true
+  },
+  "frozen_candidate_integrity_during_validation": {
+    "candidate_manifest_file_sha256_before": "d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621",
+    "candidate_manifest_file_sha256_after": "d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621",
+    "candidate_canonical_digest_before": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "candidate_canonical_digest_after": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "result": "UNCHANGED"
+  },
+  "status": "PASS"
+}

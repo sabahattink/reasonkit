@@ -1,0 +1,262 @@
+{
+  "version": "0.2",
+  "schema_version": "reasonkit-benchmark-v0.2-1",
+  "name": "ReasonKit v0.2 regression binding",
+  "description": "A deterministic v0.2 regression and provenance manifest. It binds the frozen TASK-001, TASK-002, and TASK-003 materials without changing the v0.1 manifest.",
+  "profile": "v0.2",
+  "arms": [
+    {
+      "id": "A",
+      "name": "Luna vanilla",
+      "model": "Luna",
+      "condition": "No orchestration or engineering instruction pack."
+    },
+    {
+      "id": "B",
+      "name": "Luna plus Reliable Engineering v0.1",
+      "model": "Luna",
+      "condition": "Load the frozen Reliable Engineering v0.1 baseline from evals/arms/."
+    },
+    {
+      "id": "C",
+      "name": "Luna plus ReasonKit v0.2",
+      "model": "Luna",
+      "condition": "Use the explicit v0.2 pre-candidate kernel, provider-neutral adapter, lazy-loader registry, and context plan. The frozen v0.1 debugging bundle is not a fallback."
+    },
+    {
+      "id": "D",
+      "name": "Astra vanilla",
+      "model": "Astra",
+      "condition": "No orchestration or engineering instruction pack."
+    }
+  ],
+  "cases": [
+    {
+      "id": "TASK-001",
+      "title": "Debug a small repository parser regression",
+      "promptFile": "evals/debugging/TASK-001.md",
+      "taskSha256": "e857532205e543bbfb2585035c7b6cfe164b08b4aba4f958b5308f6f5fb6756a",
+      "acceptanceFile": null,
+      "acceptanceSha256": null,
+      "workspaceSource": "evals/debugging/fixtures/task-001",
+      "workspaceSha256": "28bae609240d9704f8e1e9695a82ffb8c4eee7766d016d579705877147316b79",
+      "verificationCommand": "node parser.test.js",
+      "verificationContract": "The frozen task prompt and isolated fixture define the acceptance contract.",
+      "instructionFiles": {
+        "A": null,
+        "B": "evals/arms/reliable-engineering-v0.1.md",
+        "C": "dist/v0.2/reasonkit-kernel.md",
+        "D": null
+      },
+      "instructionSha256": {
+        "A": null,
+        "B": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+        "C": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "D": null
+      },
+      "v02Binding": {
+        "adapterPath": "adapters/generic/SYSTEM.md",
+        "adapterSha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+        "kernelPath": "dist/v0.2/reasonkit-kernel.md",
+        "kernelSha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "registryPath": "core/module-registry.json",
+        "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+        "implementationPath": "scripts/reasonkit-v02.psm1",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+        "route": "coding",
+        "fullBundleFallback": false
+      },
+      "materials": {
+        "modelVisible": [
+          "evals/debugging/TASK-001.md",
+          "evals/debugging/fixtures/task-001",
+          "adapters/generic/SYSTEM.md",
+          "dist/v0.2/reasonkit-kernel.md"
+        ],
+        "evaluatorOnly": []
+      },
+      "evaluator": null,
+      "metrics": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "instruction_bytes",
+        "tool_calls",
+        "agent_count",
+        "task_success",
+        "duration_seconds",
+        "verification_status",
+        "diff_in_scope"
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "title": "Redesign a multidisciplinary technical portfolio",
+      "promptFile": "evals/creative/TASK-002.md",
+      "taskSha256": "3c67e875f0628f1b34d734653862119d0a9b4502ed66672cca133f848ef2d2a2",
+      "acceptanceFile": "evals/creative/fixtures/task-002/acceptance.md",
+      "acceptanceSha256": "7f3da9a71c6b8f0011e4be19b80f954886c45e4574942a33cedce56d07ef9c61",
+      "workspaceSource": "evals/creative/fixtures/task-002",
+      "workspaceSha256": "5b376eb380476ac4732c42ea90e0f6340cf1db0349ebbef85158424d4a2caafa",
+      "verificationCommand": "Evaluator render and journey inspection",
+      "verificationContract": "The frozen prompt, starter acceptance, viewport contract, and independent render/journey evidence define PASS.",
+      "instructionFiles": {
+        "A": null,
+        "B": "evals/arms/reliable-engineering-v0.1.md",
+        "C": "dist/v0.2/reasonkit-kernel.md",
+        "D": null
+      },
+      "instructionSha256": {
+        "A": null,
+        "B": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+        "C": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "D": null
+      },
+      "v02Binding": {
+        "adapterPath": "adapters/generic/SYSTEM.md",
+        "adapterSha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+        "kernelPath": "dist/v0.2/reasonkit-kernel.md",
+        "kernelSha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "registryPath": "core/module-registry.json",
+        "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+        "implementationPath": "scripts/reasonkit-v02.psm1",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+        "route": "design",
+        "fullBundleFallback": false
+      },
+      "materials": {
+        "modelVisible": [
+          "evals/creative/TASK-002.md",
+          "evals/creative/fixtures/task-002",
+          "adapters/generic/SYSTEM.md",
+          "dist/v0.2/reasonkit-kernel.md"
+        ],
+        "evaluatorOnly": []
+      },
+      "evaluator": null,
+      "metrics": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "instruction_bytes",
+        "tool_calls",
+        "agent_count",
+        "genericness_score",
+        "visual_hierarchy",
+        "identity_specificity",
+        "responsive_quality",
+        "interaction_purpose",
+        "human_preference",
+        "render_inspected",
+        "verification_status"
+      ]
+    },
+    {
+      "id": "TASK-003",
+      "title": "Duplicate job processing",
+      "promptFile": "evals/debugging/TASK-003.md",
+      "taskSha256": "3da482fa15a8ef0a15b997a8f48009fc52d38324fb983ce6866d48b8da0f2fce",
+      "acceptanceFile": "evals/debugging/TASK-003.acceptance.md",
+      "acceptanceSha256": "4ee526a7f9ce1c50853dbc739cfae909fb9c30d65ade6d30628dad8d32b4bcce",
+      "workspaceSource": "evals/debugging/fixtures/task-003",
+      "workspaceSha256": "53abaea971e63b1d2db504487eef0148d97996299f127e3a714fbafad0c3c22b",
+      "verificationCommand": "npm test",
+      "verificationContract": "Public tests, held-out concurrent duplicate-delivery regression, retry preservation, and scope/integrity checks must all pass.",
+      "instructionFiles": {
+        "A": null,
+        "B": "evals/arms/reliable-engineering-v0.1.md",
+        "C": "dist/v0.2/reasonkit-kernel.md",
+        "D": null
+      },
+      "instructionSha256": {
+        "A": null,
+        "B": "67dbb7a8f276ea6f803ab7ffbd6bd56423be9cc8130db492ed4528fd5b4f98d6",
+        "C": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "D": null
+      },
+      "v02Binding": {
+        "adapterPath": "adapters/generic/SYSTEM.md",
+        "adapterSha256": "15cb7d805605f4a7326bbad925be89c7d5000e389677757e16cc7c447b42b251",
+        "kernelPath": "dist/v0.2/reasonkit-kernel.md",
+        "kernelSha256": "b23a87ddac73658f7191c5682182d83a379556520e7d08935b064e50b4d7d31a",
+        "registryPath": "core/module-registry.json",
+        "registrySha256": "43519725b79fe5d6872766eb5d053176714a37844bc69215b5a5ba0c9dbe057c",
+        "implementationPath": "scripts/reasonkit-v02.psm1",
+        "implementationSha256": "a3c7e5856eb75ed0a0df0a99901c69c0723838beee831179035d28477961acb3",
+        "route": "debugging",
+        "fullBundleFallback": false
+      },
+      "materials": {
+        "modelVisible": [
+          "evals/debugging/TASK-003.md",
+          "evals/debugging/TASK-003.acceptance.md",
+          "evals/debugging/fixtures/task-003",
+          "adapters/generic/SYSTEM.md",
+          "dist/v0.2/reasonkit-kernel.md"
+        ],
+        "evaluatorOnly": [
+          "evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1",
+          "evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js",
+          "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/idempotency.js",
+          "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/queue.js",
+          "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/repository.js",
+          "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/transaction.js",
+          "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/worker.js"
+        ]
+      },
+      "evaluator": {
+        "type": "task-003-held-out-concurrency",
+        "verifierPath": "evals/debugging/evaluator-only/TASK-003/verify-task-003.ps1",
+        "verifierSha256": "be84d8fff21e302fcd6d76dfd1cf02c5886a155d5bd8f0e8c9128366dc7b47b1",
+        "hiddenRegressionPath": "evals/debugging/evaluator-only/TASK-003/hidden-concurrency-regression.js",
+        "hiddenRegressionSha256": "fa0c9b0e62be6a5c3b1d60c0878730be4d2ceb62a641a715444951604708edef",
+        "referenceFiles": [
+          {
+            "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/idempotency.js",
+            "sha256": "f7459aed8bdb1d9554de2b74793757dad58264d74df5bed3475c25ac1d86798e"
+          },
+          {
+            "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/queue.js",
+            "sha256": "cd6eae0d6698999dc6c056bdaf3fcf8ea90b0e6749af79717ba43726e75d6135"
+          },
+          {
+            "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/repository.js",
+            "sha256": "c979f5c6f1014fcd7a6725c2d96ffe2b046500d2f8367fccc6665f097d34a69e"
+          },
+          {
+            "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/transaction.js",
+            "sha256": "082cf82902dbea83560bd68585e6a01d9367736015ce91da63540d4bf33f0085"
+          },
+          {
+            "path": "evals/debugging/evaluator-only/TASK-003/reference-fixed/src/worker.js",
+            "sha256": "23cb14af7dc31baeec6f3730eb019a362ad82c80b6d3cf315c0786c2c6951117"
+          }
+        ]
+      },
+      "metrics": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "instruction_bytes",
+        "tool_calls",
+        "agent_count",
+        "task_success",
+        "duration_seconds",
+        "verification_status",
+        "diff_in_scope",
+        "scope_violation",
+        "tests_weakened",
+        "dependencies_changed",
+        "evaluator_validity",
+        "held_out_regression",
+        "failure_class"
+      ]
+    }
+  ]
+}

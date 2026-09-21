@@ -1,0 +1,58 @@
+command: npm test
+exit_code: 1
+duration_seconds: 0.24888821300000075
+
+
+> reasonkit-task-004-config-cache@0.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: loads file values and applies numeric environment and request overrides
+ok 1 - loads file values and applies numeric environment and request overrides
+  ---
+  duration_ms: 0.785308
+  type: 'test'
+  ...
+# Subtest: does not reuse one workspace profile for another workspace
+not ok 2 - does not reuse one workspace profile for another workspace
+  ---
+  duration_ms: 1.210641
+  type: 'test'
+  location: '/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113004-581-f5908727-A-TASK-004/workspace/tests/config-loader.test.js:27:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'alpha-api'
+    - 'beta-api'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'beta-api'
+  actual: 'alpha-api'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/sabah/reasonkit-bench/source-v0.1.0-batch/evals/runs/task-004-results/runs/20260921-113004-581-f5908727-A-TASK-004/workspace/tests/config-loader.test.js:35:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: reuses the base while evaluating per-call environment overlays
+ok 3 - reuses the base while evaluating per-call environment overlays
+  ---
+  duration_ms: 0.262258
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 2
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 57.340965
