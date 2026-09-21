@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "task_id": "TASK-004",
+  "status": "TASK_004_FROZEN",
+  "package_root": "evals/task-004-authoring",
+  "deterministic_order": "repository_relative_path_ascending",
+  "normative_file_count": 28,
+  "entry_count_excluding_self": 27,
+  "self_hash_policy": {
+    "manifest_path": "evals/task-004-authoring/freeze/FREEZE-MANIFEST.json",
+    "excluded_from_entries": true,
+    "self_sha256_recorded_in": "final_task_report",
+    "reason": "Including the manifest's own digest would make the manifest self-referential."
+  },
+  "candidate_boundary": {
+    "candidate_id": "rk2-0.2.0",
+    "candidate_version": "0.2.0",
+    "candidate_freeze_commit": "19c2104aee808e9aa9215f6c433f0338e7784677",
+    "candidate_manifest_path": "dist/v0.2/candidate-manifest.json",
+    "candidate_manifest_file_sha256": "d92130b16185e4f21af3223e51a8ea38269d3fd76b5e4462f7d33d8d53ee1621",
+    "candidate_canonical_digest": "17f66740655adf279b217c6288b521212c579fc631dbc1fd44646cebd8cb1948",
+    "task_004_outside_candidate_coverage": true,
+    "candidate_used_during_authoring": false
+  },
+  "baseline_validation": "freeze/BASELINE-VALIDATION.json",
+  "entries": [
+    {
+      "repository_relative_path": "evals/task-004-authoring/acceptance.md",
+      "sha256": "bad9097b337bc18b5ae37c3f1a83f00fa530a61006050f859bb756806463e214",
+      "bytes": 1405,
+      "role": "acceptance_contract",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/evaluator-only/hidden-regression.js",
+      "sha256": "1996509f084b3e4b779baf47904174e2a51afdf149ea369c417120ae44738789",
+      "bytes": 2324,
+      "role": "hidden_regression_test",
+      "classification": "evaluator-only"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/evaluator-only/naive-fixed/src/config-loader.js",
+      "sha256": "c79d39bb5666ea9a9dfd2158d284476ee2f089dcf5e2dbaa2fc3855f9864d311",
+      "bytes": 987,
+      "role": "incomplete_fixed_material",
+      "classification": "evaluator-only"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/evaluator-only/README.md",
+      "sha256": "5e7f76084983c2ec180cc8fc6f33daa96c67ab17c0269c37f160af6a59adb4e1",
+      "bytes": 380,
+      "role": "evaluator_readme",
+      "classification": "evaluator-only"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/evaluator-only/reference-fixed/src/config-loader.js",
+      "sha256": "9a0e2a640790c1a2be6d86aa847bd5f46fe812ecbde16131dccfc0a74191d49d",
+      "bytes": 992,
+      "role": "reference_fixed_material",
+      "classification": "evaluator-only"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/evaluator-only/verify-task-004.ps1",
+      "sha256": "59c649a25c29c93043b51a0760ff6c0a1ad6bc4613ad1b4431f5f4dfd5b66ddd",
+      "bytes": 7612,
+      "role": "authoring_verifier",
+      "classification": "evaluator-only"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/notes/incident.md",
+      "sha256": "8800ce3d41d3028dab960dd29c6df0d417920dda5d7542cd394cfa1e6a123d48",
+      "bytes": 450,
+      "role": "fixture_context",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/package.json",
+      "sha256": "25976ede81d13265fbb9b6a113a218bc9d6da1a899254dec8ff6898a78337e31",
+      "bytes": 196,
+      "role": "fixture_metadata",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/README.md",
+      "sha256": "c1af3297b16b0403d547ec993d9b2716cc6c367b3c52737967170332fd7114ec",
+      "bytes": 548,
+      "role": "fixture_readme",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/config-cache.js",
+      "sha256": "9e703b7a031a76a190e244cf9cd6dc08a88c2bbdbcdd1b01a34252e3153bc9f7",
+      "bytes": 349,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/config-loader.js",
+      "sha256": "dff23e9a7e7657a9dd82f5185b59337d2d13976eb6129c20cca137c44543330a",
+      "bytes": 970,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/default-config.js",
+      "sha256": "8d1d0538597c8a2470ebb94d67f300d6d3ee7728d7e3b33abb22ecb30185e8d3",
+      "bytes": 181,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/diagnostics.js",
+      "sha256": "37cae0c3afba472fc119c614246454df45c1f8f65fc8b9e99e1dcf61d42ceeec",
+      "bytes": 129,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/env-overrides.js",
+      "sha256": "052504507f020b1bedfe0186d7c319dab5ca2681e4890d7d830094e038b30751",
+      "bytes": 766,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/src/profile-source.js",
+      "sha256": "54563053c4b25de37f694b93429896186d297816f4be6148f72661611070fd6a",
+      "bytes": 290,
+      "role": "fixture_production_source",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/tests/config-loader.test.js",
+      "sha256": "5bf52f51f6edf043b74f87b6b6c440927de2026239580c3c108579b5c707a6c3",
+      "bytes": 2071,
+      "role": "fixture_public_test",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/workspaces/alpha/config/development.json",
+      "sha256": "c5c4f21834d7078793a413cfbe1a9e865b5375eb08c872cbb65adce996abcd1e",
+      "bytes": 96,
+      "role": "fixture_fixture_data",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/workspaces/beta/config/development.json",
+      "sha256": "f626864bf693c6e175dfc93c7fcbb56fca79fa490b1ef0b42969c30138dd55ff",
+      "bytes": 92,
+      "role": "fixture_fixture_data",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/fixture-public/workspaces/gamma/config/development.json",
+      "sha256": "17c18d3e571f06064231d54c6da136aedc6e076146b239d2014e49a2c55caa97",
+      "bytes": 97,
+      "role": "fixture_fixture_data",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/freeze/BASELINE-VALIDATION.json",
+      "sha256": "3914b3995e94f524d366d3e1cdab8c9c2155c8173a610eccf4daa0e7ecfd9789",
+      "bytes": 1772,
+      "role": "baseline_validation_evidence",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/freeze/FREEZE-RECORD.md",
+      "sha256": "61e68dc2599302a5dd7eb801eeca51d6080abc1adb13150da794549c79f76e59",
+      "bytes": 2089,
+      "role": "freeze_record",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/README.md",
+      "sha256": "4913b64990e9cc64ae46b23f63e2163fb3a5c0ad795ad350f1cc4044b094da0a",
+      "bytes": 934,
+      "role": "normative_control",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/rubric.md",
+      "sha256": "b51fd109a82d6604044cfee46c949fb64f54dd9656a07c363e238a73664bf483",
+      "bytes": 1306,
+      "role": "evaluator_rubric",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/run-order.md",
+      "sha256": "fb1702ea3a809efeef5a2b602644f852dce598c681d6870364a5e84195c77288",
+      "bytes": 1009,
+      "role": "run_order",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/TASK-004-PROTOCOL.md",
+      "sha256": "bc1c57e74df3fecbef0181b846c202e1e341e8d664d30eb667328a0996ed1319",
+      "bytes": 1637,
+      "role": "protocol",
+      "classification": "protocol-control"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/task.md",
+      "sha256": "71922bf719b49285a5d30c2d9a443c5ebe4ae519af88b09b0049241d414e313a",
+      "bytes": 2230,
+      "role": "task_specification",
+      "classification": "model-visible"
+    },
+    {
+      "repository_relative_path": "evals/task-004-authoring/validity-rules.md",
+      "sha256": "33aebeb457831c3852bc0b9dd2fbffd2c43be5709c423ea03c0cdfb9694bbc0b",
+      "bytes": 1328,
+      "role": "validity_rules",
+      "classification": "protocol-control"
+    }
+  ]
+}
