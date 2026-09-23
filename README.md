@@ -23,33 +23,39 @@ stop.
 
 ## 2-minute quickstart
 
-ReasonKit v0.2.0 is a copy/load prompt-pack. It is not a provider runtime, API
-client, package, hosted service, or executable CLI, so there is no `npm install`
-or `pip install` command.
+ReasonKit is an instruction and orchestration layer, not a hosted runtime. The
+Node.js bootstrap prepares local files; the selected host performs model calls,
+tool use, and execution. It uses Node built-ins only and needs no package
+installation.
 
-1. Clone the frozen release:
+From the root of the project you want to prepare, run:
 
-   ```bash
-   git clone --branch v0.2.0 --depth 1 https://github.com/sabahattink/reasonkit.git
-   cd reasonkit
-   ```
+    git clone --depth 1 https://github.com/sabahattink/reasonkit.git ../reasonkit-bootstrap
+    node ../reasonkit-bootstrap/bin/reasonkit.mjs init --host codex --profile debugging
 
-2. For the v0.2 surface, open `dist/v0.2/reasonkit-kernel.md` together with
-   `adapters/generic/SYSTEM.md`. For a first debugging task, also load
-   `protocols/debugging.md`; choose the corresponding protocol for another task
-   category. `core/module-registry.json` is the route index.
-3. If you use ChatGPT, Codex, or Claude Code, read the matching copy/load note
-   under `adapters/` first. These are prompt-pack adapters, not runtime
-   integrations. The older generated bundles under `dist/` remain available as
-   v0.1 compatibility surfaces.
-4. Give the host one real task, its scope and constraints, and a clear
-   acceptance condition.
-5. Inspect the returned status, evidence, verification, residual unknowns, and
-   stop reason. Report setup friction through the feedback path below.
+This creates .reasonkit/ in the current project with the frozen v0.2 kernel,
+the frozen generic adapter, one selected task protocol, a small manifest, and
+host loading instructions. Supported hosts are generic, codex, and claude.
+Supported profiles are debugging, coding, architecture, and research. Existing
+.reasonkit/ content is never overwritten.
 
-There is no provider account, private-repository upload, or telemetry service
-required by this release.
+For Codex and Claude Code, the generated README gives the safe manual loading
+step and explains how to add reviewed project instructions if you want them
+loaded persistently. The bootstrap does not modify AGENTS.md, CLAUDE.md, or
+host settings. It does not start specialists, upload files, make provider
+calls, or collect telemetry.
 
+### Manual path
+
+Without the bootstrap, load these files from the ReasonKit checkout as
+instruction context:
+
+- dist/v0.2/reasonkit-kernel.md
+- adapters/generic/SYSTEM.md
+- protocols/debugging.md for a debugging task, or the matching protocol for
+  coding, architecture, or research
+
+The host remains responsible for execution.
 ## The operating loop
 
 classify → evidence → bounded specialists only when needed → execute → verify → stop

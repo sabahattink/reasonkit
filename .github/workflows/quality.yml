@@ -17,6 +17,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Test adoption bootstrap CLI
+        shell: bash
+        run: node --test tests/bootstrap.test.mjs
+
       - name: Install pinned build tokenizer
         shell: bash
         run: python -m pip install --disable-pip-version-check --no-input tiktoken==0.14.0
@@ -129,7 +133,7 @@ jobs:
           }
 
           $changedPaths = @(Get-GitLines -Arguments @('diff', '--name-only', ($env:FREEZE_COMMIT + '..HEAD')))
-          $allowedExact = @('.github/workflows/quality.yml', 'CHANGELOG.md', 'README.md')
+          $allowedExact = @('.github/workflows/quality.yml', 'CHANGELOG.md', 'README.md', 'bin/reasonkit.mjs', 'tests/bootstrap.test.mjs')
           $allowedPrefixes = @(
             'evals/runs/task-004-authoring/',
             'evals/runs/task-004-results/',
